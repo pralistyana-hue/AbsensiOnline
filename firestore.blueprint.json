@@ -1,0 +1,88 @@
+{
+  "$schema": "https://raw.githubusercontent.com/firebase/firebase-tools/master/schema/firestore-blueprint.json",
+  "entities": {
+    "Student": {
+      "collection": "students",
+      "fields": {
+        "id": { "type": "string", "required": true },
+        "nisn": { "type": "string", "required": true },
+        "name": { "type": "string", "required": true },
+        "class": { "type": "string", "required": true },
+        "gender": { "type": "string", "required": true },
+        "parentPhone": { "type": "string", "required": true },
+        "photoUrl": { "type": "string", "required": false },
+        "createdAt": { "type": "timestamp", "required": false },
+        "updatedAt": { "type": "timestamp", "required": false }
+      }
+    },
+    "AttendanceRecord": {
+      "collection": "attendance_records",
+      "fields": {
+        "id": { "type": "string", "required": true },
+        "studentId": { "type": "string", "required": true },
+        "nisn": { "type": "string", "required": true },
+        "studentName": { "type": "string", "required": true },
+        "class": { "type": "string", "required": true },
+        "date": { "type": "string", "required": true },
+        "time": { "type": "string", "required": true },
+        "status": { "type": "string", "required": true },
+        "type": { "type": "string", "required": false },
+        "notes": { "type": "string", "required": false },
+        "method": { "type": "string", "required": true },
+        "createdAt": { "type": "timestamp", "required": false }
+      }
+    },
+    "PermissionRequest": {
+      "collection": "permissions",
+      "fields": {
+        "id": { "type": "string", "required": true },
+        "nisn": { "type": "string", "required": true },
+        "studentName": { "type": "string", "required": true },
+        "class": { "type": "string", "required": true },
+        "parentPhone": { "type": "string", "required": true },
+        "type": { "type": "string", "required": true },
+        "date": { "type": "string", "required": true },
+        "reason": { "type": "string", "required": true },
+        "submittedAt": { "type": "string", "required": true },
+        "rawMessage": { "type": "string", "required": false },
+        "status": { "type": "string", "required": true }
+      }
+    },
+    "NotificationLog": {
+      "collection": "notification_logs",
+      "fields": {
+        "id": { "type": "string", "required": true },
+        "studentId": { "type": "string", "required": true },
+        "studentName": { "type": "string", "required": true },
+        "parentPhone": { "type": "string", "required": true },
+        "type": { "type": "string", "required": true },
+        "message": { "type": "string", "required": true },
+        "sentAt": { "type": "string", "required": true },
+        "status": { "type": "string", "required": true }
+      }
+    },
+    "AppSettings": {
+      "collection": "app_settings",
+      "fields": {
+        "schoolName": { "type": "string", "required": true },
+        "schoolAddress": { "type": "string", "required": true },
+        "principalName": { "type": "string", "required": true },
+        "principalNip": { "type": "string", "required": true },
+        "entryTime": { "type": "string", "required": true },
+        "cutoffTime": { "type": "string", "required": true },
+        "homeTime": { "type": "string", "required": true },
+        "lateLimitTime": { "type": "string", "required": true },
+        "activeAttendanceMode": { "type": "string", "required": true },
+        "barcodeFormat": { "type": "string", "required": true },
+        "enableAutoWhatsAppAlerts": { "type": "boolean", "required": true },
+        "waGatewayToken": { "type": "string", "required": false },
+        "waGatewayUrl": { "type": "string", "required": false },
+        "waTemplateLate": { "type": "string", "required": true },
+        "waTemplateAbsent": { "type": "string", "required": true },
+        "waTemplateApproved": { "type": "string", "required": true },
+        "waTemplateHome": { "type": "string", "required": true },
+        "waTemplateNotPickedUp": { "type": "string", "required": true }
+      }
+    }
+  }
+}

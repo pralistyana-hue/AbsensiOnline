@@ -1,0 +1,10 @@
+{
+  "name": "Absensi Siswa Barcode",
+  "description": "Aplikasi Absensi Siswa Berbasis Barcode/QR dengan Manajemen Multi-Profil Jadwal (Reguler & Khusus per Kelas), Notifikasi WhatsApp Otomatis, dan Ekspor Rekap.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

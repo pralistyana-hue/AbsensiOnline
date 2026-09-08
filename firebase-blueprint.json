@@ -1,0 +1,261 @@
+{
+  "entities": {
+    "Student": {
+      "title": "Student",
+      "description": "Data profil siswa sekolah dasar untuk absensi barcode dan perizinan",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique ID siswa"
+        },
+        "nisn": {
+          "type": "string",
+          "description": "Nomor Induk Siswa Nasional (10 digit)"
+        },
+        "name": {
+          "type": "string",
+          "description": "Nama lengkap siswa"
+        },
+        "class": {
+          "type": "string",
+          "description": "Nama kelas siswa (misal: Kelas 1, Kelas 2A)"
+        },
+        "gender": {
+          "type": "string",
+          "enum": ["L", "P"],
+          "description": "Jenis kelamin siswa"
+        },
+        "parentPhone": {
+          "type": "string",
+          "description": "Nomor WhatsApp orang tua / wali murid"
+        },
+        "photoUrl": {
+          "type": "string",
+          "description": "URL foto siswa"
+        }
+      },
+      "required": ["id", "nisn", "name", "class", "gender", "parentPhone"]
+    },
+    "HomeroomTeacher": {
+      "title": "HomeroomTeacher",
+      "description": "Data guru wali kelas untuk notifikasi absensi dan perizinan siswa per kelas",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique ID guru wali"
+        },
+        "name": {
+          "type": "string",
+          "description": "Nama lengkap guru beserta gelar"
+        },
+        "nip": {
+          "type": "string",
+          "description": "Nomor Induk Pegawai (NIP)"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Nomor WhatsApp guru wali kelas untuk menerima notifikasi izin siswa"
+        },
+        "assignedClass": {
+          "type": "string",
+          "description": "Kelas yang diampu (misal: Kelas 1, Kelas 2)"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Catatan tambahan atau fase kurikulum"
+        }
+      },
+      "required": ["id", "name", "phone", "assignedClass"]
+    },
+    "AttendanceRecord": {
+      "title": "AttendanceRecord",
+      "description": "Catatan presensi harian masuk dan pulang siswa",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique record ID"
+        },
+        "studentId": {
+          "type": "string",
+          "description": "ID siswa"
+        },
+        "nisn": {
+          "type": "string",
+          "description": "NISN siswa"
+        },
+        "studentName": {
+          "type": "string",
+          "description": "Nama siswa"
+        },
+        "class": {
+          "type": "string",
+          "description": "Kelas siswa"
+        },
+        "date": {
+          "type": "string",
+          "description": "Tanggal absensi YYYY-MM-DD"
+        },
+        "time": {
+          "type": "string",
+          "description": "Waktu absensi HH:mm:ss"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["HADIR", "TERLAMBAT", "IZIN", "SAKIT", "ALPA"],
+          "description": "Status kehadiran"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["MASUK", "PULANG"],
+          "description": "Jenis absensi"
+        },
+        "method": {
+          "type": "string",
+          "enum": ["BARCODE", "MANUAL", "PERIZINAN_WA"],
+          "description": "Metode pencatatan absensi"
+        }
+      },
+      "required": ["id", "studentId", "nisn", "studentName", "class", "date", "status", "method"]
+    },
+    "PermissionRequest": {
+      "title": "PermissionRequest",
+      "description": "Pengajuan izin atau sakit dari orang tua via WhatsApp",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique ID izin"
+        },
+        "nisn": {
+          "type": "string",
+          "description": "NISN siswa"
+        },
+        "studentName": {
+          "type": "string",
+          "description": "Nama siswa"
+        },
+        "class": {
+          "type": "string",
+          "description": "Kelas siswa"
+        },
+        "parentPhone": {
+          "type": "string",
+          "description": "No WhatsApp pengirim"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["IZIN", "SAKIT"],
+          "description": "Jenis ketidakhadiran"
+        },
+        "date": {
+          "type": "string",
+          "description": "Tanggal izin YYYY-MM-DD"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Alasan izin / surat dokter"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["PENDING", "APPROVED", "REJECTED"],
+          "description": "Status persetujuan"
+        }
+      },
+      "required": ["id", "nisn", "studentName", "class", "type", "date", "reason", "status"]
+    },
+    "NotificationLog": {
+      "title": "NotificationLog",
+      "description": "Log riwayat pengiriman notifikasi WhatsApp ke orang tua dan wali kelas",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique ID log"
+        },
+        "studentId": {
+          "type": "string",
+          "description": "ID siswa terkait"
+        },
+        "studentName": {
+          "type": "string",
+          "description": "Nama siswa"
+        },
+        "parentPhone": {
+          "type": "string",
+          "description": "Nomor tujuan WhatsApp"
+        },
+        "type": {
+          "type": "string",
+          "description": "Jenis notifikasi"
+        },
+        "message": {
+          "type": "string",
+          "description": "Isi pesan WhatsApp"
+        },
+        "sentAt": {
+          "type": "string",
+          "description": "Waktu pengiriman ISO string"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["SENT", "FAILED", "QUEUED"],
+          "description": "Status pengiriman"
+        }
+      },
+      "required": ["id", "studentId", "studentName", "parentPhone", "type", "message", "sentAt", "status"]
+    },
+    "AppSettings": {
+      "title": "AppSettings",
+      "description": "Pengaturan sekolah, jadwal, dan template notifikasi WhatsApp",
+      "type": "object",
+      "properties": {
+        "schoolName": {
+          "type": "string",
+          "description": "Nama sekolah"
+        },
+        "schoolAddress": {
+          "type": "string",
+          "description": "Alamat sekolah"
+        },
+        "principalName": {
+          "type": "string",
+          "description": "Nama kepala sekolah"
+        },
+        "principalNip": {
+          "type": "string",
+          "description": "NIP kepala sekolah"
+        }
+      },
+      "required": ["schoolName", "schoolAddress", "principalName", "principalNip"]
+    }
+  },
+  "firestore": {
+    "/students/{studentId}": {
+      "schema": "#/entities/Student",
+      "description": "Koleksi data master siswa"
+    },
+    "/homeroom_teachers/{teacherId}": {
+      "schema": "#/entities/HomeroomTeacher",
+      "description": "Koleksi data guru wali kelas"
+    },
+    "/attendance_records/{recordId}": {
+      "schema": "#/entities/AttendanceRecord",
+      "description": "Koleksi catatan absensi siswa"
+    },
+    "/permissions/{permissionId}": {
+      "schema": "#/entities/PermissionRequest",
+      "description": "Koleksi pengajuan surat izin orang tua"
+    },
+    "/notification_logs/{logId}": {
+      "schema": "#/entities/NotificationLog",
+      "description": "Koleksi riwayat log WhatsApp"
+    },
+    "/app_settings/{settingId}": {
+      "schema": "#/entities/AppSettings",
+      "description": "Koleksi konfigurasi dan template aplikasi"
+    }
+  }
+}
