@@ -56,6 +56,30 @@ export const RecapView: React.FC<RecapViewProps> = ({
     return Array.from(new Set(students.map((s) => s.class))).sort();
   }, [students]);
 
+  // Distinct grade levels (e.g., "Kelas 1", "Kelas 2")
+  const gradeLevels = useMemo(() => {
+    const grades = new Set<string>();
+    classesList.forEach((c) => {
+      const match = c.match(/^(Kelas\s*\d+)/i);
+      if (match) {
+        grades.add(match[1]);
+      }
+    });
+    return Array.from(grades).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  }, [classesList]);
+
+  // Class matcher supporting exact rombel or GRADE: prefix
+  const matchesClass = useMemo(() => {
+    return (cls: string) => {
+      if (selectedClass === 'ALL') return true;
+      if (selectedClass.startsWith('GRADE:')) {
+        const gradePrefix = selectedClass.replace('GRADE:', '');
+        return cls.startsWith(gradePrefix);
+      }
+      return cls === selectedClass;
+    };
+  }, [selectedClass]);
+
   // Calculate Week Date Range helper
   const weekInfo = useMemo(() => {
     // Week 1: 1-7, Week 2: 8-14, Week 3: 15-21, Week 4: 22-28, Week 5: 29-end of month
@@ -134,13 +158,13 @@ export const RecapView: React.FC<RecapViewProps> = ({
   // Filter students
   const filteredStudents = useMemo(() => {
     return students.filter((s) => {
-      const matchesClass = selectedClass === 'ALL' || s.class === selectedClass;
+      const matches = matchesClass(s.class);
       const matchesQuery =
         s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         s.nisn.includes(searchQuery);
-      return matchesClass && matchesQuery;
+      return matches && matchesQuery;
     });
-  }, [students, selectedClass, searchQuery]);
+  }, [students, matchesClass, searchQuery]);
 
   // Filter records within active period
   const periodRecords = useMemo(() => {
@@ -153,7 +177,7 @@ export const RecapView: React.FC<RecapViewProps> = ({
     const effectiveDays = activeDates.size || (periodType === 'DAILY' ? 1 : 0);
 
     const filteredRecords = periodRecords.filter(
-      (r) => selectedClass === 'ALL' || r.class === selectedClass
+      (r) => matchesClass(r.class)
     );
 
     const hadir = filteredRecords.filter((r) => r.status === 'HADIR').length;
@@ -431,12 +455,30 @@ export const RecapView: React.FC<RecapViewProps> = ({
                 onChange={(e) => setSelectedClass(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500 font-medium"
               >
-                <option value="ALL">Semua Kelas ({students.length} Siswa)</option>
-                {classesList.map((c) => (
-                  <option key={c} value={c}>
-                    Kelas {c}
-                  </option>
-                ))}
+                <option value="ALL">Semua Kelas & Rombel ({students.length} Siswa)</option>
+                {gradeLevels.length > 0 && (
+                  <optgroup label="Tingkat Kelas (Gabungan Semua Rombel)">
+                    {gradeLevels.map((grd) => {
+                      const count = students.filter((s) => s.class.startsWith(grd)).length;
+                      return (
+                        <option key={grd} value={`GRADE:${grd}`}>
+                          Semua {grd} ({count} Siswa)
+                        </option>
+                      );
+                    })}
+                  </optgroup>
+                )}
+                <optgroup label="Rombongan Belajar (Rombel Spesifik)">
+                  {classesList.map((c) => {
+                    const count = students.filter((s) => s.class === c).length;
+                    const displayLabel = c.startsWith('Kelas') ? c : `Kelas ${c}`;
+                    return (
+                      <option key={c} value={c}>
+                        {displayLabel} ({count} Siswa)
+                      </option>
+                    );
+                  })}
+                </optgroup>
               </select>
             </div>
           </div>

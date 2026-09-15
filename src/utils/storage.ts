@@ -53,10 +53,21 @@ export const recordScanTimestamp = (studentId: string): void => {
   }
 };
 
-const sanitizeClass = (cls: string): string => {
-  if (!cls) return 'Kelas 1';
-  // Remove suffix letters like A, B, C from Kelas 1A, 2B, etc.
-  return cls.replace(/(Kelas\s*[1-6])[A-Za-z]/i, '$1').trim();
+export const sanitizeClass = (cls: string): string => {
+  if (!cls || typeof cls !== 'string') return 'Kelas 1-A';
+  const trimmed = cls.trim();
+  // Standardize "1A" or "1-A" to "Kelas 1-A"
+  if (/^[1-6][\s\-]?[A-Za-z]$/i.test(trimmed)) {
+    const num = trimmed[0];
+    const letter = trimmed.slice(-1).toUpperCase();
+    return `Kelas ${num}-${letter}`;
+  }
+  // Standardize "Kelas 1A" to "Kelas 1-A"
+  if (/^Kelas\s*[1-6][A-Za-z]$/i.test(trimmed)) {
+    const match = trimmed.match(/^Kelas\s*([1-6])([A-Za-z])$/i);
+    if (match) return `Kelas ${match[1]}-${match[2].toUpperCase()}`;
+  }
+  return trimmed;
 };
 
 export const Storage = {

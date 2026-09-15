@@ -25,11 +25,23 @@ export interface ScheduleProfile {
   specialSchedule: DailySchedule;
 }
 
+export interface ClassRombel {
+  id: string; // e.g. 'rombel-1a'
+  name: string; // e.g. 'Kelas 1-A'
+  level?: string; // e.g. 'Kelas 1' or '1'
+  grade?: number;
+  rombelSuffix?: string;
+  code?: string; // e.g. '1-A'
+  homeroomTeacherId?: string;
+  homeroomTeacherName?: string;
+  notes?: string;
+}
+
 export interface Student {
   id: string;
   nisn: string;
   name: string;
-  class: string;
+  class: string; // Nama Rombel, misal: "Kelas 1-A", "Kelas 1-B", "Kelas 2-A"
   gender: 'L' | 'P';
   parentPhone: string; // WhatsApp number e.g., "6281234567890"
   photoUrl?: string;
@@ -40,7 +52,7 @@ export interface HomeroomTeacher {
   name: string; // Nama guru beserta gelar, e.g. "Anisa Rahmawati, S.Pd."
   nip?: string; // NIP guru, e.g. "19880315 201402 2 004"
   phone: string; // Nomor WhatsApp Wali Kelas, e.g. "6281211112222"
-  assignedClass: string; // Kelas yang diampu, e.g. "Kelas 1"
+  assignedClass: string; // Rombel yang diampu, e.g. "Kelas 1-A"
   notes?: string;
 }
 
@@ -121,6 +133,10 @@ export interface AppSettings {
   
   // Multi Schedule Profiles
   scheduleProfiles?: ScheduleProfile[];
+
+  // Daftar Rombel (Rombongan Belajar) Terdaftar
+  managedRombels?: ClassRombel[];
+  customClasses?: string[];
 
   // Legacy fallback fields for backward compatibility
   defaultSchedule?: DailySchedule;

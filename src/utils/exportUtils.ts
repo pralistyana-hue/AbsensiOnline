@@ -27,9 +27,16 @@ export function exportToExcelFlexible(
   dateFilterFn: (date: string) => boolean,
   className: string
 ) {
-  const filteredStudents = className === 'ALL'
-    ? students
-    : students.filter(s => s.class === className);
+  const matchesClass = (cls: string) => {
+    if (className === 'ALL') return true;
+    if (className.startsWith('GRADE:')) {
+      const gradePrefix = className.replace('GRADE:', '');
+      return cls.startsWith(gradePrefix);
+    }
+    return cls === className;
+  };
+
+  const filteredStudents = students.filter((s) => matchesClass(s.class));
 
   // Group records by student
   const studentStats = filteredStudents.map((std, idx) => {
@@ -59,7 +66,7 @@ export function exportToExcelFlexible(
 
   // Detailed Log
   const detailedLogs = records
-    .filter(r => dateFilterFn(r.date) && (className === 'ALL' || r.class === className))
+    .filter(r => dateFilterFn(r.date) && matchesClass(r.class))
     .map((r, idx) => ({
       'No': idx + 1,
       'Tanggal': r.date,
@@ -94,8 +101,11 @@ export function exportToExcelFlexible(
   XLSX.utils.book_append_sheet(wb, wsSummary, 'Rekap Kehadiran');
   XLSX.utils.book_append_sheet(wb, wsDetails, 'Log Detail Presensi');
 
+  const safeClassLabel = className.startsWith('GRADE:')
+    ? className.replace('GRADE:', 'Semua_')
+    : className;
   const safePeriod = periodLabel.replace(/[/\\?%*:|"<>]/g, '_');
-  const fileName = `Rekap_Presensi_${className}_${safePeriod}.xlsx`;
+  const fileName = `Rekap_Presensi_${safeClassLabel}_${safePeriod}.xlsx`;
   XLSX.writeFile(wb, fileName);
 }
 
@@ -130,9 +140,16 @@ export function exportToPDFFlexible(
     format: 'a4',
   });
 
-  const filteredStudents = className === 'ALL'
-    ? students
-    : students.filter(s => s.class === className);
+  const matchesClass = (cls: string) => {
+    if (className === 'ALL') return true;
+    if (className.startsWith('GRADE:')) {
+      const gradePrefix = className.replace('GRADE:', '');
+      return cls.startsWith(gradePrefix);
+    }
+    return cls === className;
+  };
+
+  const filteredStudents = students.filter((s) => matchesClass(s.class));
 
   // School Header
   doc.setFont('helvetica', 'bold');
@@ -155,9 +172,15 @@ export function exportToPDFFlexible(
   doc.setFontSize(13);
   doc.text('LAPORAN REKAPITULASI KEHADIRAN SISWA', 105, 42, { align: 'center' });
 
+  const classDisplayLabel = className === 'ALL'
+    ? 'Semua Kelas'
+    : className.startsWith('GRADE:')
+    ? `Semua ${className.replace('GRADE:', '')}`
+    : className;
+
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
-  doc.text(`Periode: ${periodLabel}   |   Kelas: ${className === 'ALL' ? 'Semua Kelas' : className}`, 105, 48, { align: 'center' });
+  doc.text(`Periode: ${periodLabel}   |   Kelas: ${classDisplayLabel}`, 105, 48, { align: 'center' });
 
   // Table Data Preparation
   const tableData = filteredStudents.map((std, idx) => {
@@ -231,8 +254,11 @@ export function exportToPDFFlexible(
     doc.text('NIP. ................................', 140, finalY + 33);
   }
 
+  const safeClassLabel = className.startsWith('GRADE:')
+    ? className.replace('GRADE:', 'Semua_')
+    : className;
   const safePeriod = periodLabel.replace(/[/\\?%*:|"<>]/g, '_');
-  doc.save(`Laporan_Absensi_${className}_${safePeriod}.pdf`);
+  doc.save(`Laporan_Absensi_${safeClassLabel}_${safePeriod}.pdf`);
 }
 
 /**

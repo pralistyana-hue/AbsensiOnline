@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { FileUp, Download, CheckCircle2, AlertCircle, Users, Copy, Sparkles, BookOpen } from 'lucide-react';
 import { Student, AppSettings } from '../types';
 import { normalizePhoneNumber } from '../utils/whatsapp';
+import { sanitizeClass } from '../utils/storage';
 import { LibraryImportModal } from './LibraryImportModal';
 
 interface BatchImportViewProps {
@@ -22,12 +23,12 @@ export const BatchImportView: React.FC<BatchImportViewProps> = ({
   const [importSuccessMessage, setImportSuccessMessage] = useState<string | null>(null);
   const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
 
-  // Sample data text
-  const SAMPLE_TEXT = `0151234020 | Ahmad Fauzi | Kelas 1 | L | 081234567891
-0151234021 | Annisa Tri Hapsari | Kelas 1 | P | 081298765431
-0151234022 | Bilal Ramadhan | Kelas 2 | L | 081311223355
-0151234023 | Cantika Putri | Kelas 3 | P | 081355667799
-0151234024 | Daffa Ibnu | Kelas 4 | L | 081399887700`;
+  // Sample data text with Rombel (Rombongan Belajar) support
+  const SAMPLE_TEXT = `0151234020 | Ahmad Fauzi | Kelas 1-A | L | 081234567891
+0151234021 | Annisa Tri Hapsari | Kelas 1-B | P | 081298765431
+0151234022 | Bilal Ramadhan | Kelas 2-A | L | 081311223355
+0151234023 | Cantika Putri | Kelas 2-B | P | 081355667799
+0151234024 | Daffa Ibnu | Kelas 3-A | L | 081399887700`;
 
   const handleParseText = () => {
     if (!rawText.trim()) {
@@ -48,7 +49,7 @@ export const BatchImportView: React.FC<BatchImportViewProps> = ({
       if (parts.length >= 3) {
         const nisn = parts[0] || `015123${1000 + index}`;
         const name = parts[1] || `Siswa Baru ${index + 1}`;
-        const className = parts[2] || 'Kelas 1';
+        const className = sanitizeClass(parts[2] || 'Kelas 1-A');
         const genderRaw = (parts[3] || 'L').toUpperCase();
         const gender: 'L' | 'P' = genderRaw.startsWith('P') ? 'P' : 'L';
         const phoneRaw = parts[4] || parts[3] || '6281234567890';
@@ -87,10 +88,10 @@ export const BatchImportView: React.FC<BatchImportViewProps> = ({
 
   const handleDownloadTemplate = () => {
     const csvContent = `NISN,Nama Siswa,Kelas,Jenis Kelamin,No WA Orang Tua
-0151234020,Ahmad Fauzi,Kelas 1,L,081234567891
-0151234021,Annisa Tri Hapsari,Kelas 1,P,081298765431
-0151234022,Bilal Ramadhan,Kelas 2,L,081311223355
-0151234023,Cantika Putri,Kelas 3,P,081355667799`;
+0151234020,Ahmad Fauzi,Kelas 1-A,L,081234567891
+0151234021,Annisa Tri Hapsari,Kelas 1-B,P,081298765431
+0151234022,Bilal Ramadhan,Kelas 2-A,L,081311223355
+0151234023,Cantika Putri,Kelas 2-B,P,081355667799`;
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);

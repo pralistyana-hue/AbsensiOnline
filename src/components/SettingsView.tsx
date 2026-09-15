@@ -18,25 +18,41 @@ import {
   AlertCircle,
   Users,
   CalendarCheck,
+  BookOpen,
+  GraduationCap,
+  Layers,
 } from 'lucide-react';
-import { AppSettings, DayOfWeek, ScheduleProfile } from '../types';
+import {
+  AppSettings,
+  DayOfWeek,
+  ScheduleProfile,
+  Student,
+  HomeroomTeacher,
+  ClassRombel,
+} from '../types';
 import {
   ALL_DAYS,
   getNormalizedProfiles,
   getActiveSchedule,
 } from '../utils/schedule';
-import { INITIAL_CLASSES } from '../data/initialData';
+import { INITIAL_CLASSES, INITIAL_ROMBELS } from '../data/initialData';
+import { sanitizeClass } from '../utils/storage';
+import { getTeacherForClass } from '../utils/whatsapp';
 
 interface SettingsViewProps {
   settings: AppSettings;
+  students?: Student[];
+  teachers?: HomeroomTeacher[];
   onSaveSettings: (newSettings: AppSettings) => void;
   onResetData: () => void;
 }
 
-type SettingsTab = 'profiles' | 'school' | 'whatsapp' | 'system';
+type SettingsTab = 'profiles' | 'rombels' | 'school' | 'whatsapp' | 'system';
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
   settings,
+  students = [],
+  teachers = [],
   onSaveSettings,
   onResetData,
 }) => {
@@ -52,9 +68,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     return norm[0]?.id || 'prof-sd-bawah';
   });
 
+  // Managed Rombels state
+  const [managedRombels, setManagedRombels] = useState<ClassRombel[]>(() => {
+    if (settings.managedRombels && settings.managedRombels.length > 0) {
+      return settings.managedRombels;
+    }
+    return INITIAL_ROMBELS;
+  });
+
+  // New rombel form state
+  const [newRombelGrade, setNewRombelGrade] = useState<string>('1');
+  const [newRombelSuffix, setNewRombelSuffix] = useState<string>('C');
+  const [rombelFeedback, setRombelFeedback] = useState<string | null>(null);
+
   const [formData, setFormData] = useState<AppSettings>({
     ...settings,
     scheduleProfiles: profiles,
+    managedRombels: managedRombels,
   });
 
   // Selected profile helper
@@ -154,23 +184,163 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     });
   };
 
+  // Derived all available classes/rombels
+  const allAvailableClasses = useMemo(() => {
+    return Array.from(
+      new Set([
+        ...managedRombels.map((r) => r.name),
+        ...(settings.customClasses || []),
+        ...INITIAL_CLASSES,
+        ...(students?.map((s) => s.class) || []),
+      ])
+    )
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  }, [managedRombels, settings.customClasses, students]);
+
+  // Group classes by grade
+  const classesByGrade = useMemo(() => {
+    const groups: { [grade: string]: string[] } = {};
+    allAvailableClasses.forEach((cls) => {
+      const match = cls.match(/^(Kelas\s*\d+)/i);
+      const grade = match ? match[1] : 'Lainnya';
+      if (!groups[grade]) groups[grade] = [];
+      groups[grade].push(cls);
+    });
+    return groups;
+  }, [allAvailableClasses]);
+
   // Quick class presets
   const handleQuickAssignClasses = (type: 'ALL' | '1-2' | '3-4' | '5-6' | 'CLEAR') => {
     handleUpdateCurrentProfile((prev) => {
       let newClasses: string[] = [];
       if (type === 'ALL') {
-        newClasses = [...INITIAL_CLASSES];
+        newClasses = [...allAvailableClasses];
       } else if (type === '1-2') {
-        newClasses = ['Kelas 1', 'Kelas 2'];
+        newClasses = allAvailableClasses.filter((c) => /Kelas\s*[1-2]/i.test(c));
       } else if (type === '3-4') {
-        newClasses = ['Kelas 3', 'Kelas 4'];
+        newClasses = allAvailableClasses.filter((c) => /Kelas\s*[3-4]/i.test(c));
       } else if (type === '5-6') {
-        newClasses = ['Kelas 5', 'Kelas 6'];
+        newClasses = allAvailableClasses.filter((c) => /Kelas\s*[5-6]/i.test(c));
       } else {
         newClasses = [];
       }
       return { ...prev, assignedClasses: newClasses };
     });
+  };
+
+  // Rombel Management Handlers
+  const handleAddRombel = (e: React.FormEvent) => {
+    e.preventDefault();
+    const gradeNum = parseInt(newRombelGrade, 10);
+    const suffix = newRombelSuffix.trim().toUpperCase();
+    if (!suffix) return;
+
+    const formattedName = sanitizeClass(
+      isNaN(gradeNum) ? `${newRombelGrade} ${suffix}` : `Kelas ${gradeNum}-${suffix}`
+    );
+
+    if (managedRombels.some((r) => r.name.toLowerCase() === formattedName.toLowerCase())) {
+      setRombelFeedback(`Rombel "${formattedName}" sudah ada dalam daftar.`);
+      setTimeout(() => setRombelFeedback(null), 3000);
+      return;
+    }
+
+    const newRombel: ClassRombel = {
+      id: `rombel-${Date.now()}`,
+      name: formattedName,
+      grade: isNaN(gradeNum) ? 1 : gradeNum,
+      rombelSuffix: suffix,
+    };
+
+    const updated = [...managedRombels, newRombel].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { numeric: true })
+    );
+    setManagedRombels(updated);
+    setFormData((prev) => ({ ...prev, managedRombels: updated }));
+
+    setRombelFeedback(`Berhasil menambahkan rombel ${formattedName}!`);
+    setTimeout(() => setRombelFeedback(null), 3000);
+  };
+
+  const handleDeleteRombel = (rombelId: string, rombelName: string) => {
+    const studentCount = students.filter((s) => s.class === rombelName).length;
+    if (studentCount > 0) {
+      if (
+        !confirm(
+          `Peringatan: Masih ada ${studentCount} siswa terdaftar di ${rombelName}. Apakah Anda yakin ingin menghapus rombel ini?`
+        )
+      ) {
+        return;
+      }
+    } else {
+      if (!confirm(`Hapus rombel ${rombelName}?`)) return;
+    }
+
+    const updated = managedRombels.filter((r) => r.id !== rombelId);
+    setManagedRombels(updated);
+    setFormData((prev) => ({ ...prev, managedRombels: updated }));
+
+    // Also remove from profiles
+    setProfiles((prev) =>
+      prev.map((prof) => ({
+        ...prof,
+        assignedClasses: (prof.assignedClasses || []).filter((c) => c !== rombelName),
+      }))
+    );
+  };
+
+  const handleGeneratePresetRombels = (format: 'SINGLE' | '2_ROMBELS' | '3_ROMBELS') => {
+    let generated: ClassRombel[] = [];
+    if (format === 'SINGLE') {
+      generated = [1, 2, 3, 4, 5, 6].map((g) => ({
+        id: `rombel-k${g}`,
+        name: `Kelas ${g}`,
+        grade: g,
+        rombelSuffix: '',
+      }));
+    } else if (format === '2_ROMBELS') {
+      const list: ClassRombel[] = [];
+      [1, 2, 3, 4, 5, 6].forEach((g) => {
+        ['A', 'B'].forEach((sfx) => {
+          list.push({
+            id: `rombel-k${g}-${sfx.toLowerCase()}`,
+            name: `Kelas ${g}-${sfx}`,
+            grade: g,
+            rombelSuffix: sfx,
+          });
+        });
+      });
+      generated = list;
+    } else if (format === '3_ROMBELS') {
+      const list: ClassRombel[] = [];
+      [1, 2, 3, 4, 5, 6].forEach((g) => {
+        ['A', 'B', 'C'].forEach((sfx) => {
+          list.push({
+            id: `rombel-k${g}-${sfx.toLowerCase()}`,
+            name: `Kelas ${g}-${sfx}`,
+            grade: g,
+            rombelSuffix: sfx,
+          });
+        });
+      });
+      generated = list;
+    }
+
+    if (
+      !confirm(
+        `Generate template rombel otomatis ini? Rombel saat ini akan digantikan oleh preset ${
+          format === 'SINGLE' ? '1 Rombel' : format === '2_ROMBELS' ? '2 Rombel (A & B)' : '3 Rombel (A, B, C)'
+        }.`
+      )
+    ) {
+      return;
+    }
+
+    setManagedRombels(generated);
+    setFormData((prev) => ({ ...prev, managedRombels: generated }));
+    setRombelFeedback(`Preset berhasil dimuat (${generated.length} rombel dibuat)!`);
+    setTimeout(() => setRombelFeedback(null), 3000);
   };
 
   // Regular days toggle
@@ -237,6 +407,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     const payload: AppSettings = {
       ...formData,
       scheduleProfiles: profiles,
+      managedRombels: managedRombels,
+      customClasses: allAvailableClasses,
       defaultSchedule: primaryProfile.regularSchedule,
       specialSchedule: primaryProfile.specialSchedule,
       enableSpecialSchedule: primaryProfile.enableSpecialSchedule,
@@ -309,6 +481,26 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             }`}
           >
             {profiles.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('rombels')}
+          className={`flex items-center space-x-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
+            activeTab === 'rombels'
+              ? 'bg-emerald-500 text-slate-950 font-bold shadow-sm'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+          }`}
+        >
+          <Users className="w-3.5 h-3.5" />
+          <span>Kelas & Rombel</span>
+          <span
+            className={`px-1.5 py-0.2 rounded text-[10px] ${
+              activeTab === 'rombels' ? 'bg-slate-950/20 text-slate-950 font-black' : 'bg-slate-800 text-slate-400'
+            }`}
+          >
+            {managedRombels.length}
           </span>
         </button>
 
@@ -550,40 +742,70 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   </div>
                 </div>
 
-                {/* Minimalist Class Choice Buttons */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 pt-1">
-                  {INITIAL_CLASSES.map((cls) => {
-                    const isAssignedToThis = currentProfile.assignedClasses?.includes(cls);
-                    const otherProf = profiles.find(
-                      (p) => p.id !== currentProfile.id && p.assignedClasses?.includes(cls)
-                    );
-
-                    return (
-                      <button
-                        type="button"
-                        key={cls}
-                        onClick={() => toggleClassAssignment(cls)}
-                        className={`px-3 py-2.5 rounded-xl text-xs font-semibold transition-all border flex items-center justify-between ${
-                          isAssignedToThis
-                            ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-sm'
-                            : otherProf
-                            ? 'bg-slate-950/60 border-slate-800/80 text-slate-400 hover:border-slate-700'
-                            : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
-                        }`}
-                      >
-                        <span className="font-bold">{cls}</span>
-                        <div
-                          className={`w-4 h-4 rounded-md flex items-center justify-center text-[10px] ${
-                            isAssignedToThis
-                              ? 'bg-emerald-500 text-slate-950 font-bold'
-                              : 'border border-slate-700'
-                          }`}
+                {/* Class Choice Buttons grouped by Grade */}
+                <div className="space-y-3 pt-1">
+                  {Object.entries(classesByGrade).map(([grade, classList]) => (
+                    <div key={grade} className="bg-slate-950/40 p-2.5 rounded-xl border border-slate-800/60">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[11px] font-bold text-slate-300">{grade}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const allInThisAssigned = classList.every((c) =>
+                              currentProfile.assignedClasses?.includes(c)
+                            );
+                            handleUpdateCurrentProfile((prev) => {
+                              const existing = prev.assignedClasses || [];
+                              let next: string[];
+                              if (allInThisAssigned) {
+                                next = existing.filter((c) => !classList.includes(c));
+                              } else {
+                                next = Array.from(new Set([...existing, ...classList]));
+                              }
+                              return { ...prev, assignedClasses: next };
+                            });
+                          }}
+                          className="text-[10px] text-emerald-400 hover:text-emerald-300 font-semibold transition"
                         >
-                          {isAssignedToThis && <Check className="w-2.5 h-2.5 stroke-[3]" />}
-                        </div>
-                      </button>
-                    );
-                  })}
+                          Pilih / Batal Semua {grade}
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                        {classList.map((cls) => {
+                          const isAssignedToThis = currentProfile.assignedClasses?.includes(cls);
+                          const otherProf = profiles.find(
+                            (p) => p.id !== currentProfile.id && p.assignedClasses?.includes(cls)
+                          );
+
+                          return (
+                            <button
+                              type="button"
+                              key={cls}
+                              onClick={() => toggleClassAssignment(cls)}
+                              className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all border flex items-center justify-between ${
+                                isAssignedToThis
+                                  ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-sm'
+                                  : otherProf
+                                  ? 'bg-slate-950/60 border-slate-800/80 text-slate-400 hover:border-slate-700'
+                                  : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
+                              }`}
+                            >
+                              <span className="font-bold">{cls}</span>
+                              <div
+                                className={`w-4 h-4 rounded-md flex items-center justify-center text-[10px] ${
+                                  isAssignedToThis
+                                    ? 'bg-emerald-500 text-slate-950 font-bold'
+                                    : 'border border-slate-700'
+                                }`}
+                              >
+                                {isAssignedToThis && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -935,7 +1157,233 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       )}
 
-      {/* TAB 2: IDENTITAS SEKOLAH */}
+      {/* TAB: MANAJEMEN KELAS & ROMBEL */}
+      {activeTab === 'rombels' && (
+        <div className="space-y-4">
+          {/* Feedback message */}
+          {rombelFeedback && (
+            <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs font-semibold text-emerald-300 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>{rombelFeedback}</span>
+            </div>
+          )}
+
+          {/* Top Banner / Description */}
+          <div className="bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-800 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-emerald-400" />
+                  Manajemen Rombongan Belajar (Rombel)
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Kelola struktur rombel sekolah (misal: Kelas 1-A, Kelas 1-B) yang terhubung ke presensi barcode, laporan rekapitulasi, dan notifikasi WhatsApp wali murid.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs">
+                <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold">
+                  {managedRombels.length} Rombel Terdaftar
+                </span>
+              </div>
+            </div>
+
+            {/* Quick Generator & Presets */}
+            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-2.5">
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <h4 className="text-xs font-bold text-slate-200">
+                  Generator Cepat Format Rombel (1-Klik)
+                </h4>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Pilih susunan standar rombel untuk sekolah Anda secara instan:
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => handleGeneratePresetRombels('SINGLE')}
+                  className="p-2.5 bg-slate-900 hover:bg-slate-850 hover:border-slate-700 border border-slate-800 rounded-xl text-left transition group"
+                >
+                  <div className="text-xs font-bold text-white group-hover:text-emerald-400 transition">
+                    Format 1 Rombel
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
+                    Kelas 1 s/d 6 (6 Rombel Tunggal)
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleGeneratePresetRombels('2_ROMBELS')}
+                  className="p-2.5 bg-slate-900 hover:bg-slate-850 hover:border-emerald-500/50 border border-slate-800 rounded-xl text-left transition group"
+                >
+                  <div className="text-xs font-bold text-white group-hover:text-emerald-400 transition">
+                    Format 2 Rombel (A & B)
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
+                    Kelas 1-A s/d 6-B (12 Rombel)
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleGeneratePresetRombels('3_ROMBELS')}
+                  className="p-2.5 bg-slate-900 hover:bg-slate-850 hover:border-emerald-500/50 border border-slate-800 rounded-xl text-left transition group"
+                >
+                  <div className="text-xs font-bold text-white group-hover:text-emerald-400 transition">
+                    Format 3 Rombel (A, B, C)
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
+                    Kelas 1-A s/d 6-C (18 Rombel)
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* Tambah Rombel Manual Form */}
+            <form onSubmit={handleAddRombel} className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Plus className="w-3.5 h-3.5 text-emerald-400" />
+                  <h4 className="text-xs font-bold text-slate-200">
+                    Tambah Rombel Kustom
+                  </h4>
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  Pratinjau: <span className="font-mono font-bold text-emerald-400">{sanitizeClass(isNaN(parseInt(newRombelGrade, 10)) ? `${newRombelGrade} ${newRombelSuffix}` : `Kelas ${newRombelGrade}-${newRombelSuffix}`)}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 items-end">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                    Tingkat Kelas:
+                  </label>
+                  <select
+                    value={newRombelGrade}
+                    onChange={(e) => setNewRombelGrade(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500 font-medium"
+                  >
+                    <option value="1">Kelas 1</option>
+                    <option value="2">Kelas 2</option>
+                    <option value="3">Kelas 3</option>
+                    <option value="4">Kelas 4</option>
+                    <option value="5">Kelas 5</option>
+                    <option value="6">Kelas 6</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                    Kode / Suffix Rombel:
+                  </label>
+                  <input
+                    type="text"
+                    value={newRombelSuffix}
+                    onChange={(e) => setNewRombelSuffix(e.target.value)}
+                    placeholder="Contoh: A, B, C, Tahfidz, ICP"
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500 font-medium uppercase"
+                  />
+                </div>
+
+                <div>
+                  <button
+                    type="submit"
+                    className="w-full px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-sm"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Tambahkan Rombel</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          {/* Daftar Rombel Terdaftar (Grouped by Grade) */}
+          <div className="space-y-3">
+            {Object.entries(classesByGrade).map(([grade, classList]) => {
+              return (
+                <div key={grade} className="bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                    <div className="flex items-center gap-2">
+                      <GraduationCap className="w-4 h-4 text-emerald-400" />
+                      <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                        {grade}
+                      </h4>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-semibold">
+                        {classList.length} Rombel
+                      </span>
+                    </div>
+
+                    <div className="text-[11px] text-slate-400">
+                      Total Siswa: <strong className="text-white">{students.filter((s) => s.class.startsWith(grade)).length}</strong>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                    {classList.map((clsName) => {
+                      const matchedRombel = managedRombels.find((r) => r.name === clsName);
+                      const studentCount = students.filter((s) => s.class === clsName).length;
+                      const teacher = getTeacherForClass(teachers, clsName);
+                      const assignedProfile = profiles.find((p) =>
+                        p.assignedClasses?.includes(clsName)
+                      );
+
+                      return (
+                        <div
+                          key={clsName}
+                          className="bg-slate-950/70 p-3 rounded-xl border border-slate-800/80 flex flex-col justify-between space-y-2 hover:border-slate-700 transition"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <span className="text-xs font-bold text-white">
+                                {clsName}
+                              </span>
+                              <div className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
+                                <Users className="w-3 h-3 text-slate-500" />
+                                <span>{studentCount} Siswa terdaftar</span>
+                              </div>
+                            </div>
+
+                            {matchedRombel && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteRombel(matchedRombel.id, clsName)}
+                                title="Hapus rombel ini"
+                                className="p-1 hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 rounded-lg transition"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-800/60 space-y-1 text-[10px]">
+                            <div className="flex items-center justify-between text-slate-400">
+                              <span>Wali Kelas:</span>
+                              <span className={`font-semibold truncate max-w-[130px] ${teacher ? 'text-emerald-300' : 'text-slate-500 italic'}`}>
+                                {teacher ? teacher.name : 'Belum ditentukan'}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between text-slate-400">
+                              <span>Profil Jam:</span>
+                              <span className="font-semibold text-slate-300 truncate max-w-[130px]">
+                                {assignedProfile ? assignedProfile.name : 'Profil Default'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
       {activeTab === 'school' && (
         <div className="bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-800 space-y-4">
           <div className="border-b border-slate-800 pb-3">

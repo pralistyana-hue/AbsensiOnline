@@ -48,30 +48,39 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [selectedClass, setSelectedClass] = useState('ALL');
   const [evaluationFeedback, setEvaluationFeedback] = useState<string | null>(null);
 
+  const matchesClass = useMemo(() => {
+    return (cls: string) => {
+      if (selectedClass === 'ALL') return true;
+      if (selectedClass.startsWith('GRADE:')) {
+        const gradePrefix = selectedClass.replace('GRADE:', '');
+        return cls.startsWith(gradePrefix);
+      }
+      return cls === selectedClass;
+    };
+  }, [selectedClass]);
+
   // Filter students based on selected class
   const filteredStudents = useMemo(() => {
-    return selectedClass === 'ALL'
-      ? students
-      : students.filter((s) => s.class === selectedClass);
-  }, [students, selectedClass]);
+    return students.filter((s) => matchesClass(s.class));
+  }, [students, matchesClass]);
 
   // Filter records for the selected specific single day & class
   const dayRecords = useMemo(() => {
     return records.filter(
       (r) =>
         r.date === selectedDate &&
-        (selectedClass === 'ALL' || r.class === selectedClass)
+        matchesClass(r.class)
     );
-  }, [records, selectedDate, selectedClass]);
+  }, [records, selectedDate, matchesClass]);
 
   // Filter permissions for the selected date & class
   const dayPermissions = useMemo(() => {
     return permissions.filter(
       (p) =>
         p.date === selectedDate &&
-        (selectedClass === 'ALL' || p.class === selectedClass)
+        (selectedClass === 'ALL' || matchesClass(p.class))
     );
-  }, [permissions, selectedDate, selectedClass]);
+  }, [permissions, selectedDate, matchesClass]);
 
   // Calculate active schedule for the selected date & class
   const selectedDateObj = useMemo(() => new Date(`${selectedDate}T00:00:00`), [selectedDate]);
@@ -120,6 +129,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const classesList = useMemo(() => {
     return Array.from(new Set(students.map((s) => s.class))).sort();
   }, [students]);
+
+  // Distinct grade levels (e.g., "Kelas 1", "Kelas 2")
+  const gradeLevels = useMemo(() => {
+    const grades = new Set<string>();
+    classesList.forEach((c) => {
+      const match = c.match(/^(Kelas\s*\d+)/i);
+      if (match) {
+        grades.add(match[1]);
+      }
+    });
+    return Array.from(grades).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  }, [classesList]);
 
   // Per-class analytics for the selected day
   const classStats = useMemo(() => {
@@ -305,12 +326,30 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 onChange={(e) => setSelectedClass(e.target.value)}
                 className="pl-9 pr-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-emerald-500"
               >
-                <option value="ALL">Semua Kelas ({students.length} Siswa)</option>
-                {classesList.map((c) => (
-                  <option key={c} value={c}>
-                    Kelas {c}
-                  </option>
-                ))}
+                <option value="ALL">Semua Kelas & Rombel ({students.length} Siswa)</option>
+                {gradeLevels.length > 0 && (
+                  <optgroup label="Tingkat Kelas (Semua Rombel)">
+                    {gradeLevels.map((grd) => {
+                      const count = students.filter((s) => s.class.startsWith(grd)).length;
+                      return (
+                        <option key={grd} value={`GRADE:${grd}`}>
+                          Semua {grd} ({count} Siswa)
+                        </option>
+                      );
+                    })}
+                  </optgroup>
+                )}
+                <optgroup label="Rombongan Belajar (Rombel Spesifik)">
+                  {classesList.map((c) => {
+                    const count = students.filter((s) => s.class === c).length;
+                    const displayLabel = c.startsWith('Kelas') ? c : `Kelas ${c}`;
+                    return (
+                      <option key={c} value={c}>
+                        {displayLabel} ({count} Siswa)
+                      </option>
+                    );
+                  })}
+                </optgroup>
               </select>
             </div>
           </div>

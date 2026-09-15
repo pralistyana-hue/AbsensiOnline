@@ -207,13 +207,16 @@ function cleanStudentName(raw: string): string {
 }
 
 function normalizeClassName(raw: string): string {
-  const clean = raw.trim().toUpperCase();
-  if (/^KELAS\s*/i.test(clean)) return clean;
-  const match = clean.match(/([1-6])\s*([A-F])?/);
+  if (!raw) return 'Kelas 1-A';
+  const clean = raw.trim();
+  const match = clean.match(/^(?:KELAS\s*)?([1-6])[\s\-_]?([A-Za-z])?$/i);
   if (match) {
-    return `Kelas ${match[1]}${match[2] || 'A'}`;
+    const num = match[1];
+    const letter = match[2] ? match[2].toUpperCase() : 'A';
+    return `Kelas ${num}-${letter}`;
   }
-  return 'Kelas 1A';
+  if (/^KELAS\s*/i.test(clean)) return clean;
+  return `Kelas ${clean}`;
 }
 
 function guessGender(name: string): 'L' | 'P' {

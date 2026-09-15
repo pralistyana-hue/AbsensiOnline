@@ -42,6 +42,17 @@ export const LibraryImportModal: React.FC<LibraryImportModalProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const availableClasses = React.useMemo(() => {
+    return Array.from(
+      new Set([
+        ...INITIAL_CLASSES,
+        ...(settings.customClasses || []),
+        ...(settings.managedRombels?.map((r) => r.name) || []),
+        ...existingStudents.map((s) => s.class),
+      ])
+    ).filter(Boolean);
+  }, [settings, existingStudents]);
+
   if (!isOpen) return null;
 
   const handleFileUpload = async (selectedFile: File) => {
@@ -334,7 +345,7 @@ export const LibraryImportModal: React.FC<LibraryImportModalProps> = ({
                     className="bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2.5 py-1 text-xs font-semibold"
                   >
                     <option value="Otomatis">Otomatis dari PDF</option>
-                    {INITIAL_CLASSES.map((cls) => (
+                    {availableClasses.map((cls) => (
                       <option key={cls} value={cls}>
                         {cls}
                       </option>

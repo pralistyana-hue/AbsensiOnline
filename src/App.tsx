@@ -713,6 +713,8 @@ export default function App() {
         {activeTab === 'settings' && (
           <SettingsView
             settings={settings}
+            students={students}
+            teachers={teachers}
             onSaveSettings={handleSaveSettings}
             onResetData={handleResetData}
           />
