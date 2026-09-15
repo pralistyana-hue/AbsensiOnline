@@ -29,7 +29,16 @@ import {
   deleteScanFailureLogFirestore,
   saveSettingsFirestore,
   generateBulkStudentsFirestore,
+  deleteNotificationLogsBatchFirestore,
+  clearAllStudentsFirestore,
+  clearAllTeachersFirestore,
+  clearAllAttendanceFirestore,
+  clearAllPermissionsFirestore,
+  restoreStudentsFirestore,
+  restoreTeachersFirestore,
+  markFirestoreInitialized,
 } from './lib/firebase';
+import { INITIAL_ROMBELS, INITIAL_CLASSES } from './data/initialData';
 import { collection, onSnapshot, doc } from 'firebase/firestore';
 import { Header } from './components/Header';
 import { Navigation } from './components/Navigation';
@@ -88,40 +97,45 @@ export default function App() {
     const setupFirestore = async () => {
       try {
         setIsSyncing(true);
-        // Seed if first time
-        await seedInitialFirestoreData();
 
         // 1. Realtime Students Listener
         unsubscribeStudents = onSnapshot(
           collection(db, COLLECTIONS.STUDENTS),
           (snapshot) => {
-            if (!snapshot.empty) {
-              const cloudStudents: Student[] = [];
-              snapshot.forEach((docSnap) => {
-                const data = docSnap.data() as Student;
-                cloudStudents.push({ ...data, id: docSnap.id });
-              });
+            const cloudStudents: Student[] = [];
+            snapshot.forEach((docSnap) => {
+              const data = docSnap.data() as Student;
+              cloudStudents.push({ ...data, id: docSnap.id });
+            });
+            if (!snapshot.empty || Storage.isInitialized()) {
               setStudents(cloudStudents);
               Storage.saveStudents(cloudStudents);
             }
             setIsCloudConnected(true);
+            setCloudStatusMsg('Firebase Firestore Realtime Aktif');
           },
           (error) => {
             console.warn('Firestore students listener fallback to local:', error);
             setIsCloudConnected(false);
+            setCloudStatusMsg('Mode Offline / Sinkronisasi Lokal');
           }
         );
+
+        // Background seed if first time without blocking listener attachment
+        seedInitialFirestoreData().catch((e) => {
+          console.warn('Background seed check deferred:', e);
+        });
 
         // 2. Realtime Homeroom Teachers Listener
         unsubscribeTeachers = onSnapshot(
           collection(db, COLLECTIONS.TEACHERS),
           (snapshot) => {
-            if (!snapshot.empty) {
-              const cloudTeachers: HomeroomTeacher[] = [];
-              snapshot.forEach((docSnap) => {
-                const data = docSnap.data() as HomeroomTeacher;
-                cloudTeachers.push({ ...data, id: docSnap.id });
-              });
+            const cloudTeachers: HomeroomTeacher[] = [];
+            snapshot.forEach((docSnap) => {
+              const data = docSnap.data() as HomeroomTeacher;
+              cloudTeachers.push({ ...data, id: docSnap.id });
+            });
+            if (!snapshot.empty || Storage.isInitialized()) {
               setTeachers(cloudTeachers);
               Storage.saveTeachers(cloudTeachers);
             }
@@ -135,12 +149,12 @@ export default function App() {
         unsubscribeAttendance = onSnapshot(
           collection(db, COLLECTIONS.ATTENDANCE),
           (snapshot) => {
-            if (!snapshot.empty) {
-              const cloudRecords: AttendanceRecord[] = [];
-              snapshot.forEach((docSnap) => {
-                const data = docSnap.data() as AttendanceRecord;
-                cloudRecords.push({ ...data, id: docSnap.id });
-              });
+            const cloudRecords: AttendanceRecord[] = [];
+            snapshot.forEach((docSnap) => {
+              const data = docSnap.data() as AttendanceRecord;
+              cloudRecords.push({ ...data, id: docSnap.id });
+            });
+            if (!snapshot.empty || Storage.isInitialized()) {
               setAttendanceRecords(cloudRecords);
               Storage.saveAttendance(cloudRecords);
             }
@@ -154,12 +168,12 @@ export default function App() {
         unsubscribePermissions = onSnapshot(
           collection(db, COLLECTIONS.PERMISSIONS),
           (snapshot) => {
-            if (!snapshot.empty) {
-              const cloudPerms: PermissionRequest[] = [];
-              snapshot.forEach((docSnap) => {
-                const data = docSnap.data() as PermissionRequest;
-                cloudPerms.push({ ...data, id: docSnap.id });
-              });
+            const cloudPerms: PermissionRequest[] = [];
+            snapshot.forEach((docSnap) => {
+              const data = docSnap.data() as PermissionRequest;
+              cloudPerms.push({ ...data, id: docSnap.id });
+            });
+            if (!snapshot.empty || Storage.isInitialized()) {
               setPermissions(cloudPerms);
               Storage.savePermissions(cloudPerms);
             }
@@ -184,18 +198,28 @@ export default function App() {
           }
         );
 
-        // 5. Realtime Notification Logs Listener
+        // 5. Realtime Notification Logs Listener (with auto-prune previous days)
         unsubscribeLogs = onSnapshot(
           collection(db, COLLECTIONS.NOTIFICATIONS),
           (snapshot) => {
             if (!snapshot.empty) {
               const cloudLogs: NotificationLog[] = [];
+              const todayStr = new Date().toISOString().split('T')[0];
+              const oldLogIds: string[] = [];
               snapshot.forEach((docSnap) => {
                  const data = docSnap.data() as NotificationLog;
-                 cloudLogs.push({ ...data, id: docSnap.id });
+                 const item = { ...data, id: docSnap.id };
+                 if (item.date && item.date < todayStr) {
+                   oldLogIds.push(item.id);
+                 } else {
+                   cloudLogs.push(item);
+                 }
               });
               setNotificationLogs(cloudLogs);
               Storage.saveNotificationLogs(cloudLogs);
+              if (oldLogIds.length > 0) {
+                deleteNotificationLogsBatchFirestore(oldLogIds).catch(console.error);
+              }
             }
           },
           (error) => {
@@ -535,6 +559,56 @@ export default function App() {
     saveSettingsFirestore(newSettings).catch(console.error);
   };
 
+  const handleDeleteClass = (className: string, deleteStudents: boolean) => {
+    // 1. Delete or unassign students
+    if (deleteStudents) {
+      const remainingStudents = students.filter((s) => s.class !== className);
+      const toDelete = students.filter((s) => s.class === className);
+      setStudents(remainingStudents);
+      Storage.saveStudents(remainingStudents);
+      toDelete.forEach((s) => {
+        deleteStudentFirestore(s.id).catch(console.error);
+      });
+    }
+
+    // 2. Clear assignedClass from teachers of this class
+    const updatedTeachers = teachers.map((t) =>
+      t.assignedClass === className ? { ...t, assignedClass: '' } : t
+    );
+    setTeachers(updatedTeachers);
+    Storage.saveTeachers(updatedTeachers);
+    teachers.forEach((t) => {
+      if (t.assignedClass === className) {
+        saveTeacherFirestore({ ...t, assignedClass: '' }).catch(console.error);
+      }
+    });
+
+    // 3. Remove from managedRombels and customClasses
+    const currentRombels = settings.managedRombels || INITIAL_ROMBELS;
+    const updatedRombels = currentRombels.filter(
+      (r) => r.name !== className && r.code !== className
+    );
+
+    const currentCustomClasses = settings.customClasses || INITIAL_CLASSES;
+    const updatedCustomClasses = currentCustomClasses.filter((c) => c !== className);
+
+    // 4. Remove from scheduleProfiles assignedClasses
+    const updatedProfiles = (settings.scheduleProfiles || []).map((p) => ({
+      ...p,
+      assignedClasses: p.assignedClasses?.filter((c) => c !== className) || [],
+    }));
+
+    const newSettings: AppSettings = {
+      ...settings,
+      managedRombels: updatedRombels,
+      customClasses: updatedCustomClasses,
+      scheduleProfiles: updatedProfiles,
+    };
+    setSettings(newSettings);
+    Storage.saveSettings(newSettings);
+    saveSettingsFirestore(newSettings).catch(console.error);
+  };
+
   const handleResetData = () => {
     Storage.resetAllData();
     setStudents(Storage.getStudents());
@@ -544,6 +618,76 @@ export default function App() {
     setScanFailures(Storage.getScanFailureLogs());
     setSettings(Storage.getSettings());
     alert('Data berhasil di-reset ke kondisi awal Sekolah Dasar!');
+  };
+
+  const handleClearData = async (options: {
+    clearStudents: boolean;
+    clearTeachers: boolean;
+    clearAttendance: boolean;
+  }) => {
+    try {
+      setIsSyncing(true);
+      Storage.markInitialized();
+      Storage.clearData({
+        students: options.clearStudents,
+        teachers: options.clearTeachers,
+        attendance: options.clearAttendance,
+        permissions: options.clearAttendance,
+      });
+
+      if (options.clearStudents) {
+        setStudents([]);
+        await clearAllStudentsFirestore().catch(console.error);
+      }
+
+      if (options.clearTeachers) {
+        setTeachers([]);
+        await clearAllTeachersFirestore().catch(console.error);
+      }
+
+      if (options.clearAttendance) {
+        setAttendanceRecords([]);
+        setPermissions([]);
+        await clearAllAttendanceFirestore().catch(console.error);
+        await clearAllPermissionsFirestore().catch(console.error);
+      }
+
+      await markFirestoreInitialized().catch(console.error);
+    } catch (err) {
+      console.error('Error clearing data:', err);
+      throw err;
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleRestoreBackup = async (backupData: {
+    students?: Student[];
+    teachers?: HomeroomTeacher[];
+  }) => {
+    try {
+      setIsSyncing(true);
+      Storage.markInitialized();
+
+      if (backupData.students && backupData.students.length > 0) {
+        setStudents(backupData.students);
+        Storage.saveStudents(backupData.students);
+        await restoreStudentsFirestore(backupData.students).catch(console.error);
+      }
+
+      if (backupData.teachers && backupData.teachers.length > 0) {
+        setTeachers(backupData.teachers);
+        Storage.saveTeachers(backupData.teachers);
+        await restoreTeachersFirestore(backupData.teachers).catch(console.error);
+      }
+
+      await markFirestoreInitialized().catch(console.error);
+    } catch (err) {
+      console.error('Error restoring backup:', err);
+      throw err;
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const handleGenerate100Students = async () => {
@@ -676,6 +820,9 @@ export default function App() {
             onAddTeacher={handleAddTeacher}
             onUpdateTeacher={handleUpdateTeacher}
             onDeleteTeacher={handleDeleteTeacher}
+            onDeleteClass={handleDeleteClass}
+            onClearData={handleClearData}
+            onRestoreBackup={handleRestoreBackup}
           />
         )}
 
@@ -699,6 +846,20 @@ export default function App() {
               setNotificationLogs(updated);
               Storage.saveNotificationLogs(updated);
               saveNotificationLogFirestore(log).catch(console.error);
+            }}
+            onDeleteLogs={(logIds) => {
+              const updated = notificationLogs.filter((l) => !logIds.includes(l.id));
+              setNotificationLogs(updated);
+              Storage.saveNotificationLogs(updated);
+              deleteNotificationLogsBatchFirestore(logIds).catch(console.error);
+            }}
+            onClearAllLogs={() => {
+              const today = new Date().toISOString().split('T')[0];
+              const toDeleteIds = notificationLogs.filter((l) => !l.date || l.date === today).map((l) => l.id);
+              const remaining = notificationLogs.filter((l) => l.date && l.date !== today);
+              setNotificationLogs(remaining);
+              Storage.saveNotificationLogs(remaining);
+              deleteNotificationLogsBatchFirestore(toDeleteIds).catch(console.error);
             }}
           />
         )}

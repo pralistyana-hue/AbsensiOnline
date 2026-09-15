@@ -1,11 +1,14 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
+import { getAuth, Auth } from 'firebase/auth';
 import {
+  initializeFirestore,
   getFirestore,
   Firestore,
   collection,
   doc,
   getDocs,
   getDoc,
+  getDocFromServer,
   setDoc,
   updateDoc,
   deleteDoc,
@@ -16,6 +19,7 @@ import {
   orderBy,
   limit,
   Timestamp,
+  setLogLevel,
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { Student, AttendanceRecord, PermissionRequest, NotificationLog, AppSettings, HomeroomTeacher, ScanFailureLog, CardResolutionStatus } from '../types';
@@ -29,10 +33,95 @@ if (!getApps().length) {
   app = getApp();
 }
 
-// Initialize Firestore with custom databaseId if configured
-export const db: Firestore = firebaseConfig.firestoreDatabaseId
-  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
-  : getFirestore(app);
+// Safely get Auth instance if registered without throwing component registration errors
+export function getFirebaseAuth(): Auth | null {
+  try {
+    return getAuth(app);
+  } catch {
+    return null;
+  }
+}
+
+export const auth: Auth | null = getFirebaseAuth();
+
+// Suppress noisy internal Firestore WebChannel transient retry messages
+setLogLevel('silent');
+
+// Initialize Firestore with custom databaseId and resilient connection settings
+let firestoreInstance: Firestore;
+try {
+  firestoreInstance = initializeFirestore(
+    app,
+    {
+      experimentalAutoDetectLongPolling: true,
+    },
+    firebaseConfig.firestoreDatabaseId || undefined
+  );
+} catch {
+  firestoreInstance = firebaseConfig.firestoreDatabaseId
+    ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
+    : getFirestore(app);
+}
+
+export const db: Firestore = firestoreInstance;
+
+// Test Firestore connection on boot
+export async function testConnection(): Promise<boolean> {
+  try {
+    await getDocFromServer(doc(db, 'test', 'connection'));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Error handling standard conforming to Firebase skill
+export enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  };
+}
+
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth?.currentUser?.uid || null,
+      email: auth?.currentUser?.email || null,
+      emailVerified: auth?.currentUser?.emailVerified || null,
+      isAnonymous: auth?.currentUser?.isAnonymous || null,
+      tenantId: auth?.currentUser?.tenantId || null,
+      providerInfo: auth?.currentUser?.providerData?.map((provider) => ({
+        providerId: provider.providerId,
+        email: provider.email,
+      })) || [],
+    },
+    operationType,
+    path,
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
 
 // Firestore Collection References
 export const COLLECTIONS = {
@@ -70,6 +159,16 @@ function sanitizeForFirestore<T extends Record<string, any>>(obj: T): Record<str
  */
 export async function seedInitialFirestoreData(): Promise<void> {
   try {
+    const settingsDocRef = doc(db, COLLECTIONS.SETTINGS, 'default');
+    const settingsSnap = await getDoc(settingsDocRef);
+    if (settingsSnap.exists()) {
+      const data = settingsSnap.data();
+      if (data?.initialSeedCompleted) {
+        // Database is already initialized or user intentionally cleared it for production/hosting
+        return;
+      }
+    }
+
     // Check if students collection has data
     const studentsRef = collection(db, COLLECTIONS.STUDENTS);
     const snapshot = await getDocs(studentsRef);
@@ -90,9 +189,11 @@ export async function seedInitialFirestoreData(): Promise<void> {
         batch.set(studentDoc, data);
       });
 
-      // Seed Initial Settings
-      const settingsDoc = doc(db, COLLECTIONS.SETTINGS, 'default');
-      batch.set(settingsDoc, sanitizeForFirestore(INITIAL_SETTINGS));
+      // Seed Initial Settings with initialSeedCompleted flag
+      batch.set(settingsDocRef, sanitizeForFirestore({
+        ...INITIAL_SETTINGS,
+        initialSeedCompleted: true,
+      }), { merge: true });
 
       // Seed Initial Homeroom Teachers
       INITIAL_TEACHERS.forEach((teacher) => {
@@ -141,7 +242,7 @@ export async function seedInitialFirestoreData(): Promise<void> {
       console.log('Firestore seed completed successfully!');
     }
   } catch (error) {
-    console.error('Error seeding Firestore data:', error);
+    console.warn('Firestore initial seed deferred or skipped (offline/sync pending):', error);
   }
 }
 
@@ -279,7 +380,25 @@ export async function updatePermissionStatusFirestore(
 // Notification Logs Operations
 export async function saveNotificationLogFirestore(log: NotificationLog): Promise<void> {
   const logDoc = doc(db, COLLECTIONS.NOTIFICATIONS, log.id);
-  await setDoc(logDoc, sanitizeForFirestore(log), { merge: true });
+  await setDoc(logDoc, sanitizeForFirestore({
+    ...log,
+    date: log.date || new Date().toISOString().split('T')[0],
+  }), { merge: true });
+}
+
+export async function deleteNotificationLogFirestore(logId: string): Promise<void> {
+  const logDoc = doc(db, COLLECTIONS.NOTIFICATIONS, logId);
+  await deleteDoc(logDoc);
+}
+
+export async function deleteNotificationLogsBatchFirestore(logIds: string[]): Promise<void> {
+  if (logIds.length === 0) return;
+  const batch = writeBatch(db);
+  logIds.forEach((id) => {
+    const logDoc = doc(db, COLLECTIONS.NOTIFICATIONS, id);
+    batch.delete(logDoc);
+  });
+  await batch.commit();
 }
 
 // Scan Failure Logs Operations
@@ -318,3 +437,150 @@ export async function saveSettingsFirestore(settings: AppSettings): Promise<void
   const settingsDoc = doc(db, COLLECTIONS.SETTINGS, 'default');
   await setDoc(settingsDoc, sanitizeForFirestore(settings), { merge: true });
 }
+
+// Mark Firestore as initialized (so dummy seeds will never re-populate empty database)
+export async function markFirestoreInitialized(): Promise<void> {
+  try {
+    const settingsDoc = doc(db, COLLECTIONS.SETTINGS, 'default');
+    await setDoc(
+      settingsDoc,
+      sanitizeForFirestore({
+        initialSeedCompleted: true,
+        updatedAt: Timestamp.now(),
+      }),
+      { merge: true }
+    );
+  } catch (error) {
+    console.warn('Failed to mark Firestore as initialized:', error);
+  }
+}
+
+// Clear All Students in Firestore
+export async function clearAllStudentsFirestore(): Promise<void> {
+  try {
+    const snap = await getDocs(collection(db, COLLECTIONS.STUDENTS));
+    if (snap.empty) return;
+    let batch = writeBatch(db);
+    let count = 0;
+    for (const docSnap of snap.docs) {
+      batch.delete(docSnap.ref);
+      count++;
+      if (count % 400 === 0) {
+        await batch.commit();
+        batch = writeBatch(db);
+      }
+    }
+    await batch.commit();
+  } catch (error) {
+    console.error('Failed to clear students from Firestore:', error);
+    throw error;
+  }
+}
+
+// Clear All Teachers in Firestore
+export async function clearAllTeachersFirestore(): Promise<void> {
+  try {
+    const snap = await getDocs(collection(db, COLLECTIONS.TEACHERS));
+    if (snap.empty) return;
+    let batch = writeBatch(db);
+    let count = 0;
+    for (const docSnap of snap.docs) {
+      batch.delete(docSnap.ref);
+      count++;
+      if (count % 400 === 0) {
+        await batch.commit();
+        batch = writeBatch(db);
+      }
+    }
+    await batch.commit();
+  } catch (error) {
+    console.error('Failed to clear teachers from Firestore:', error);
+    throw error;
+  }
+}
+
+// Clear All Attendance Records in Firestore
+export async function clearAllAttendanceFirestore(): Promise<void> {
+  try {
+    const snap = await getDocs(collection(db, COLLECTIONS.ATTENDANCE));
+    if (snap.empty) return;
+    let batch = writeBatch(db);
+    let count = 0;
+    for (const docSnap of snap.docs) {
+      batch.delete(docSnap.ref);
+      count++;
+      if (count % 400 === 0) {
+        await batch.commit();
+        batch = writeBatch(db);
+      }
+    }
+    await batch.commit();
+  } catch (error) {
+    console.error('Failed to clear attendance records from Firestore:', error);
+    throw error;
+  }
+}
+
+// Clear All Permissions in Firestore
+export async function clearAllPermissionsFirestore(): Promise<void> {
+  try {
+    const snap = await getDocs(collection(db, COLLECTIONS.PERMISSIONS));
+    if (snap.empty) return;
+    let batch = writeBatch(db);
+    let count = 0;
+    for (const docSnap of snap.docs) {
+      batch.delete(docSnap.ref);
+      count++;
+      if (count % 400 === 0) {
+        await batch.commit();
+        batch = writeBatch(db);
+      }
+    }
+    await batch.commit();
+  } catch (error) {
+    console.error('Failed to clear permissions from Firestore:', error);
+    throw error;
+  }
+}
+
+// Restore / Bulk import Students to Firestore
+export async function restoreStudentsFirestore(students: Student[]): Promise<void> {
+  if (!students || students.length === 0) return;
+  let batch = writeBatch(db);
+  let count = 0;
+  for (const s of students) {
+    const sDoc = doc(db, COLLECTIONS.STUDENTS, s.id);
+    batch.set(sDoc, sanitizeForFirestore({
+      ...s,
+      photoUrl: s.photoUrl || '',
+      updatedAt: Timestamp.now(),
+    }), { merge: true });
+    count++;
+    if (count % 400 === 0) {
+      await batch.commit();
+      batch = writeBatch(db);
+    }
+  }
+  await batch.commit();
+}
+
+// Restore / Bulk import Teachers to Firestore
+export async function restoreTeachersFirestore(teachers: HomeroomTeacher[]): Promise<void> {
+  if (!teachers || teachers.length === 0) return;
+  let batch = writeBatch(db);
+  let count = 0;
+  for (const t of teachers) {
+    const tDoc = doc(db, COLLECTIONS.TEACHERS, t.id);
+    batch.set(tDoc, sanitizeForFirestore({
+      ...t,
+      updatedAt: Timestamp.now(),
+    }), { merge: true });
+    count++;
+    if (count % 400 === 0) {
+      await batch.commit();
+      batch = writeBatch(db);
+    }
+  }
+  await batch.commit();
+}
+

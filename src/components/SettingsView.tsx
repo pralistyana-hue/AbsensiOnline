@@ -544,99 +544,60 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </button>
       </div>
 
-      {/* TAB 1: PROFIL JADWAL */}
+      {/* TAB 1: PROFIL JADWAL (SEDERHANA, MUDAH & INTUITIF) */}
       {activeTab === 'profiles' && (
         <div className="space-y-4">
-          {/* Multi-Profile Concurrent Banner */}
-          <div className="bg-slate-900/90 p-4 rounded-2xl border border-emerald-500/30 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <h3 className="font-bold text-white text-sm">Semua Profil Aktif & Berjalan Beriringan</h3>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  Multi-Tingkat Otomatis
-                </span>
+          {/* Top Profile Selector Tabs */}
+          <div className="bg-slate-900 p-3.5 sm:p-4 rounded-2xl border border-slate-800 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                  Pilih Profil Jadwal Kelas
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Setiap profil otomatis berjalan serentak sesuai rombel kelas siswa.
+                </p>
               </div>
-              <p className="text-[11px] text-slate-300">
-                Setiap profil berstatus aktif secara default dan berjalan bersamaan (beriringan). Jam masuk, batas toleransi, dan jam pulang akan otomatis berlaku sesuai tingkatan kelas siswa (misal: Kelas 1–2 pulang pukul 10.30 WIB, Kelas 3–6 pulang pukul 12.30 WIB).
-              </p>
-            </div>
 
-            <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
                 onClick={handleAddProfile}
-                className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl flex items-center space-x-1.5 transition-all shadow-sm"
+                className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold rounded-xl flex items-center gap-1.5 transition self-start sm:self-auto"
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Tambah Profil Kelas</span>
+                <Plus className="w-3.5 h-3.5 text-emerald-400" />
+                <span>+ Tambah Profil Baru</span>
               </button>
             </div>
-          </div>
 
-          {/* Profile Cards Grid */}
-          <div className="bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-800 space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5 text-emerald-400" />
-                  Daftar Profil Jadwal Berjalan Serentak ({profiles.length} Profil)
-                </h3>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  Klik pada profil di bawah untuk mengedit pengaturan jam dan kelas yang ditugaskan.
-                </p>
-              </div>
-            </div>
-
-            {/* Profiles Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+            {/* Profile Selection Horizontal Button List */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
               {profiles.map((prof) => {
                 const isSelected = prof.id === selectedProfileId;
                 const classCount = prof.assignedClasses?.length || 0;
 
                 return (
-                  <div
+                  <button
                     key={prof.id}
+                    type="button"
                     onClick={() => setSelectedProfileId(prof.id)}
-                    className={`p-3.5 rounded-xl border cursor-pointer transition-all relative text-left ${
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 border ${
                       isSelected
-                        ? 'bg-slate-800/90 border-emerald-500 shadow-sm'
-                        : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 hover:bg-slate-800/40'
+                        ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-md shadow-emerald-500/20'
+                        : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700 hover:bg-slate-800/60'
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <h4 className="font-bold text-xs sm:text-sm text-white truncate">{prof.name}</h4>
-                          <span className="px-1.5 py-0.2 bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 rounded text-[9px] font-semibold shrink-0">
-                            Aktif
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
-                          <Users className="w-3 h-3 text-slate-500" />
-                          <span className="truncate">
-                            {classCount > 0
-                              ? `${prof.assignedClasses.join(', ')}`
-                              : 'Semua Kelas / Cadangan'}
-                          </span>
-                        </p>
-                      </div>
-
-                      {isSelected && (
-                        <div className="w-4 h-4 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center shrink-0">
-                          <Check className="w-3 h-3 stroke-[3]" />
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400 font-mono">
-                      <span>Masuk: <strong className="text-emerald-400">{prof.regularSchedule?.entryTime}</strong></span>
-                      <span>Pulang: <strong className="text-sky-400">{prof.regularSchedule?.homeTime}</strong></span>
-                      {prof.enableSpecialSchedule && (
-                        <span>Khusus: <strong className="text-amber-400">{prof.specialSchedule?.homeTime}</strong></span>
-                      )}
-                    </div>
-                  </div>
+                    <span>{prof.name}</span>
+                    <span
+                      className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
+                        isSelected
+                          ? 'bg-slate-950/20 text-slate-950 font-bold'
+                          : 'bg-slate-800 text-slate-400'
+                      }`}
+                    >
+                      {classCount} Kelas
+                    </span>
+                  </button>
                 );
               })}
             </div>
@@ -645,11 +606,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           {/* ACTIVE PROFILE EDITOR */}
           {currentProfile && (
             <div className="bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-800 space-y-5">
-              {/* Profile Top Controls */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
-                <div className="flex-1 max-w-sm">
+              {/* Profile Header & Name */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+                <div className="flex-1 max-w-md">
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Nama Profil:
+                    Nama Profil Jadwal:
                   </label>
                   <input
                     type="text"
@@ -657,197 +618,152 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     onChange={(e) =>
                       handleUpdateCurrentProfile((prev) => ({ ...prev, name: e.target.value }))
                     }
-                    placeholder="Contoh: Kelas Bawah (Kelas 1 - 2)"
-                    className="w-full bg-slate-950 border border-slate-700 focus:border-emerald-500 rounded-lg px-3 py-1.5 text-xs font-medium text-white focus:outline-none"
+                    placeholder="Misal: Kelas Bawah (Kelas 1 - 2)"
+                    className="w-full bg-slate-950 border border-slate-700 focus:border-emerald-500 rounded-xl px-3 py-2 text-xs font-medium text-white focus:outline-none"
                   />
                 </div>
 
-                <div className="flex items-center gap-1.5 self-end sm:self-auto">
-                  <span className="px-2.5 py-1.5 bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-xs font-semibold rounded-lg flex items-center space-x-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                    <span>Aktif Berjalan Beriringan</span>
-                  </span>
-
+                <div className="flex items-center gap-2 self-end sm:self-auto">
                   <button
                     type="button"
                     onClick={() => handleDuplicateProfile(currentProfile)}
                     title="Duplikat profil ini"
-                    className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg border border-slate-700 transition-all"
+                    className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center gap-1.5"
                   >
                     <Copy className="w-3.5 h-3.5" />
+                    <span>Duplikat</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => handleDeleteProfile(currentProfile.id)}
-                    title="Hapus profil"
+                    title="Hapus profil ini"
                     disabled={profiles.length <= 1}
-                    className="p-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 rounded-lg border border-rose-500/30 transition-all disabled:opacity-30"
+                    className="px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold rounded-xl border border-rose-500/30 transition disabled:opacity-30 flex items-center gap-1.5"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
+                    <span>Hapus</span>
                   </button>
                 </div>
               </div>
 
-              {/* 1. KELAS YANG DITUGASKAN (SIMPEL & MINIMALIS) */}
-              <div className="space-y-2.5">
+              {/* 1. KELAS YANG MENGGUNAKAN JADWAL INI */}
+              <div className="space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
                     <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
                       <Users className="w-3.5 h-3.5 text-emerald-400" />
-                      1. Pilih Kelas untuk Profil Ini:
+                      1. Kelas yang Ditugaskan ({currentProfile.assignedClasses?.length || 0} Kelas)
                     </h4>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      Pilih kelas (Kelas 1 s/d 6) yang akan menggunakan aturan jam profil ini.
+                      Klik rombel di bawah untuk mengaktifkan atau menonaktifkan jadwal profil ini.
                     </p>
                   </div>
 
-                  {/* Minimalist Quick Presets */}
-                  <div className="flex items-center gap-1 text-[11px]">
+                  {/* Simple Quick Presets */}
+                  <div className="flex items-center gap-1 text-[11px] flex-wrap">
+                    <span className="text-[10px] text-slate-500 mr-1">Preset Cepat:</span>
                     <button
                       type="button"
                       onClick={() => handleQuickAssignClasses('ALL')}
-                      className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition-all"
+                      className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition"
                     >
                       Semua
                     </button>
                     <button
                       type="button"
                       onClick={() => handleQuickAssignClasses('1-2')}
-                      className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition-all"
+                      className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition"
                     >
-                      1 - 2
+                      Kelas 1 - 2
                     </button>
                     <button
                       type="button"
                       onClick={() => handleQuickAssignClasses('3-4')}
-                      className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition-all"
+                      className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition"
                     >
-                      3 - 4
+                      Kelas 3 - 4
                     </button>
                     <button
                       type="button"
                       onClick={() => handleQuickAssignClasses('5-6')}
-                      className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition-all"
+                      className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition"
                     >
-                      5 - 6
+                      Kelas 5 - 6
                     </button>
                     <button
                       type="button"
                       onClick={() => handleQuickAssignClasses('CLEAR')}
-                      className="px-2 py-0.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded transition-all"
+                      className="px-2 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg text-xs font-semibold transition"
                     >
-                      Reset
+                      Kosongkan
                     </button>
                   </div>
                 </div>
 
-                {/* Class Choice Buttons grouped by Grade */}
-                <div className="space-y-3 pt-1">
-                  {Object.entries(classesByGrade).map(([grade, classList]) => (
-                    <div key={grade} className="bg-slate-950/40 p-2.5 rounded-xl border border-slate-800/60">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[11px] font-bold text-slate-300">{grade}</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const allInThisAssigned = classList.every((c) =>
-                              currentProfile.assignedClasses?.includes(c)
-                            );
-                            handleUpdateCurrentProfile((prev) => {
-                              const existing = prev.assignedClasses || [];
-                              let next: string[];
-                              if (allInThisAssigned) {
-                                next = existing.filter((c) => !classList.includes(c));
-                              } else {
-                                next = Array.from(new Set([...existing, ...classList]));
-                              }
-                              return { ...prev, assignedClasses: next };
-                            });
-                          }}
-                          className="text-[10px] text-emerald-400 hover:text-emerald-300 font-semibold transition"
+                {/* Compact Interactive Chips for Classes */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2 pt-1">
+                  {allAvailableClasses.map((cls) => {
+                    const isAssigned = currentProfile.assignedClasses?.includes(cls);
+                    return (
+                      <button
+                        type="button"
+                        key={cls}
+                        onClick={() => toggleClassAssignment(cls)}
+                        className={`p-2 rounded-xl text-xs font-bold transition flex items-center justify-between border ${
+                          isAssigned
+                            ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-sm'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-white'
+                        }`}
+                      >
+                        <span>{cls}</span>
+                        <div
+                          className={`w-4 h-4 rounded-md flex items-center justify-center text-[10px] ${
+                            isAssigned
+                              ? 'bg-emerald-500 text-slate-950 font-bold'
+                              : 'border border-slate-700'
+                          }`}
                         >
-                          Pilih / Batal Semua {grade}
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                        {classList.map((cls) => {
-                          const isAssignedToThis = currentProfile.assignedClasses?.includes(cls);
-                          const otherProf = profiles.find(
-                            (p) => p.id !== currentProfile.id && p.assignedClasses?.includes(cls)
-                          );
-
-                          return (
-                            <button
-                              type="button"
-                              key={cls}
-                              onClick={() => toggleClassAssignment(cls)}
-                              className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all border flex items-center justify-between ${
-                                isAssignedToThis
-                                  ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-sm'
-                                  : otherProf
-                                  ? 'bg-slate-950/60 border-slate-800/80 text-slate-400 hover:border-slate-700'
-                                  : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
-                              }`}
-                            >
-                              <span className="font-bold">{cls}</span>
-                              <div
-                                className={`w-4 h-4 rounded-md flex items-center justify-center text-[10px] ${
-                                  isAssignedToThis
-                                    ? 'bg-emerald-500 text-slate-950 font-bold'
-                                    : 'border border-slate-700'
-                                }`}
-                              >
-                                {isAssignedToThis && <Check className="w-2.5 h-2.5 stroke-[3]" />}
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
+                          {isAssigned && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* 2. JADWAL REGULER */}
-              <div className="p-3.5 sm:p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-3.5">
-                <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
-                  <div className="flex items-center space-x-1.5">
-                    <Clock className="w-3.5 h-3.5 text-emerald-400" />
+              {/* 2. JAM MASUK & PULANG REGULER */}
+              <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+                  <div className="flex items-center space-x-2">
+                    <Clock className="w-4 h-4 text-emerald-400" />
                     <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400">
-                      2. Jadwal Reguler (Hari Standar)
+                      2. Aturan Jam Masuk & Pulang Reguler
                     </h4>
                   </div>
-                  <span className="text-[10px] text-slate-400">Waktu Masuk & Pulang</span>
+                  <span className="text-[11px] text-slate-400">Hari Masuk Reguler</span>
                 </div>
 
-                {/* Day Selection */}
-                <div className="space-y-1.5">
-                  <div className="flex flex-wrap items-center justify-between gap-1.5">
-                    <label className="text-[11px] font-semibold text-slate-300">
-                      Pilih Hari Masuk Reguler:
+                {/* Day selector & presets */}
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <label className="text-xs font-semibold text-slate-300">
+                      Hari Masuk Sekolah:
                     </label>
-                    <div className="flex items-center gap-1 text-[10px]">
-                      <button
-                        type="button"
-                        onClick={() => setRegularDaysPreset('SENIN_KAMIS')}
-                        className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition-all"
-                      >
-                        Sen-Kam
-                      </button>
+                    <div className="flex items-center gap-1.5 text-xs">
                       <button
                         type="button"
                         onClick={() => setRegularDaysPreset('SENIN_JUMAT')}
-                        className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition-all"
+                        className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-semibold transition text-xs"
                       >
-                        Sen-Jum
+                        Senin - Jumat (5 Hari)
                       </button>
                       <button
                         type="button"
                         onClick={() => setRegularDaysPreset('SENIN_SABTU')}
-                        className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition-all"
+                        className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-semibold transition text-xs"
                       >
-                        Sen-Sab
+                        Senin - Sabtu (6 Hari)
                       </button>
                     </div>
                   </div>
@@ -860,34 +776,31 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                           type="button"
                           key={day.key}
                           onClick={() => toggleRegularDay(day.key)}
-                          className={`py-1.5 px-2 rounded-lg text-xs font-medium border flex items-center justify-between transition-all ${
+                          className={`py-1.5 px-2 rounded-xl text-xs font-bold border flex items-center justify-between transition ${
                             isChecked
-                              ? 'bg-emerald-500/15 border-emerald-500 text-emerald-300 font-bold'
-                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                              ? 'bg-emerald-500/15 border-emerald-500 text-emerald-300'
+                              : 'bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-700'
                           }`}
                         >
                           <span>{day.short}</span>
-                          <div
-                            className={`w-3 h-3 rounded flex items-center justify-center ${
-                              isChecked
-                                ? 'bg-emerald-500 text-slate-950 font-bold'
-                                : 'border border-slate-700'
-                            }`}
-                          >
-                            {isChecked && <Check className="w-2 h-2 stroke-[3]" />}
-                          </div>
+                          {isChecked && <Check className="w-3 h-3 text-emerald-400 stroke-[3]" />}
                         </button>
                       );
                     })}
                   </div>
                 </div>
 
-                {/* 3 Time Inputs */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-                  <div className="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800">
-                    <label className="block text-[11px] font-semibold text-emerald-400 mb-1">
-                      Jam Masuk (WIB):
-                    </label>
+                {/* 3 Main Time Setting Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+                  {/* Jam Masuk */}
+                  <div className="bg-slate-900 p-3.5 rounded-xl border border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>Jam Masuk</span>
+                      </label>
+                      <span className="text-[10px] text-slate-400 font-mono">Pagi</span>
+                    </div>
                     <input
                       type="time"
                       value={currentProfile.regularSchedule.entryTime}
@@ -897,14 +810,36 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                           regularSchedule: { ...prev.regularSchedule, entryTime: e.target.value },
                         }))
                       }
-                      className="w-full bg-slate-950 border border-slate-700 focus:border-emerald-500 rounded-md px-2.5 py-1 text-xs font-mono text-white focus:outline-none"
+                      className="w-full bg-slate-950 border border-slate-700 focus:border-emerald-500 rounded-lg px-3 py-1.5 text-sm font-mono font-bold text-white focus:outline-none"
                     />
+                    <div className="flex gap-1">
+                      {['06:45', '07:00', '07:15'].map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() =>
+                            handleUpdateCurrentProfile((prev) => ({
+                              ...prev,
+                              regularSchedule: { ...prev.regularSchedule, entryTime: t },
+                            }))
+                          }
+                          className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 rounded text-[10px] font-mono text-slate-300 transition"
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
-                  <div className="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800">
-                    <label className="block text-[11px] font-semibold text-amber-400 mb-1">
-                      Batas Terlambat (WIB):
-                    </label>
+                  {/* Batas Terlambat */}
+                  <div className="bg-slate-900 p-3.5 rounded-xl border border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                        <AlertCircle className="w-3.5 h-3.5" />
+                        <span>Batas Toleransi Terlambat</span>
+                      </label>
+                      <span className="text-[10px] text-slate-400 font-mono">Toleransi</span>
+                    </div>
                     <input
                       type="time"
                       value={currentProfile.regularSchedule.cutoffTime}
@@ -914,14 +849,36 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                           regularSchedule: { ...prev.regularSchedule, cutoffTime: e.target.value },
                         }))
                       }
-                      className="w-full bg-slate-950 border border-slate-700 focus:border-amber-500 rounded-md px-2.5 py-1 text-xs font-mono text-white focus:outline-none"
+                      className="w-full bg-slate-950 border border-slate-700 focus:border-amber-500 rounded-lg px-3 py-1.5 text-sm font-mono font-bold text-white focus:outline-none"
                     />
+                    <div className="flex gap-1">
+                      {['07:10', '07:15', '07:20', '07:30'].map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() =>
+                            handleUpdateCurrentProfile((prev) => ({
+                              ...prev,
+                              regularSchedule: { ...prev.regularSchedule, cutoffTime: t },
+                            }))
+                          }
+                          className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 rounded text-[10px] font-mono text-slate-300 transition"
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
-                  <div className="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800">
-                    <label className="block text-[11px] font-semibold text-sky-400 mb-1">
-                      Jam Pulang (WIB):
-                    </label>
+                  {/* Jam Pulang Reguler */}
+                  <div className="bg-slate-900 p-3.5 rounded-xl border border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-sky-400 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Jam Pulang Standar</span>
+                      </label>
+                      <span className="text-[10px] text-slate-400 font-mono">Siang</span>
+                    </div>
                     <input
                       type="time"
                       value={currentProfile.regularSchedule.homeTime}
@@ -931,25 +888,47 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                           regularSchedule: { ...prev.regularSchedule, homeTime: e.target.value },
                         }))
                       }
-                      className="w-full bg-slate-950 border border-slate-700 focus:border-sky-500 rounded-md px-2.5 py-1 text-xs font-mono text-white focus:outline-none"
+                      className="w-full bg-slate-950 border border-slate-700 focus:border-sky-500 rounded-lg px-3 py-1.5 text-sm font-mono font-bold text-white focus:outline-none"
                     />
+                    <div className="flex gap-1 flex-wrap">
+                      {['10:30', '11:30', '12:00', '12:30', '13:00'].map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() =>
+                            handleUpdateCurrentProfile((prev) => ({
+                              ...prev,
+                              regularSchedule: { ...prev.regularSchedule, homeTime: t },
+                            }))
+                          }
+                          className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 rounded text-[10px] font-mono text-slate-300 transition"
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* 3. JADWAL KHUSUS (MISAL: JUMAT / SENAM) */}
-              <div className="p-3.5 sm:p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-3.5">
-                <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
-                  <div className="flex items-center space-x-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400">
-                      3. Jam Khusus (Misal: Hari Jumat / Kepulangan Awal)
-                    </h4>
+              {/* 3. JADWAL KHUSUS (HARI JUMAT / PULANG AWAL) */}
+              <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+                  <div className="flex items-center space-x-2">
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400">
+                        3. Jam Khusus Hari Jumat (Pulang Lebih Awal)
+                      </h4>
+                      <p className="text-[11px] text-slate-400">
+                        Untuk kepulangan lebih awal hari Jumat sebelum waktu Sholat Jumat.
+                      </p>
+                    </div>
                   </div>
 
                   {/* Switch Toggle */}
-                  <label className="flex items-center cursor-pointer space-x-2">
-                    <span className="text-[11px] font-medium text-slate-300">
+                  <label className="flex items-center cursor-pointer space-x-2 shrink-0">
+                    <span className="text-xs font-semibold text-slate-300">
                       {currentProfile.enableSpecialSchedule ? 'Aktif' : 'Non-Aktif'}
                     </span>
                     <input
@@ -963,15 +942,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       }
                       className="sr-only peer"
                     />
-                    <div className="w-8 h-4 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-amber-500"></div>
+                    <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
                   </label>
                 </div>
 
                 {currentProfile.enableSpecialSchedule ? (
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                        Keterangan Jam Khusus:
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div className="bg-slate-900 p-3.5 rounded-xl border border-slate-800 space-y-2">
+                      <label className="block text-xs font-semibold text-slate-300">
+                        Nama Keterangan Khusus:
                       </label>
                       <input
                         type="text"
@@ -982,17 +961,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                             specialSchedule: { ...prev.specialSchedule, name: e.target.value },
                           }))
                         }
-                        placeholder="Contoh: Jumat Kepulangan Awal"
-                        className="w-full bg-slate-900 border border-slate-700 focus:border-amber-500 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none"
+                        placeholder="Contoh: Hari Jumat (Pulang Awal)"
+                        className="w-full bg-slate-950 border border-slate-700 focus:border-amber-500 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none"
                       />
-                    </div>
-
-                    {/* Special Days */}
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-semibold text-slate-300">
-                        Pilih Hari Berlakunya Jam Khusus:
-                      </label>
-                      <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
+                      <div className="flex items-center gap-1.5 pt-1">
+                        <span className="text-[11px] text-slate-400">Berlaku di:</span>
                         {ALL_DAYS.map((day) => {
                           const isChecked = currentProfile.specialSchedule?.days?.includes(day.key);
                           return (
@@ -1000,107 +973,79 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                               type="button"
                               key={day.key}
                               onClick={() => toggleSpecialDay(day.key)}
-                              className={`py-1.5 px-2 rounded-lg text-xs font-medium border flex items-center justify-between transition-all ${
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold border transition ${
                                 isChecked
-                                  ? 'bg-amber-500/15 border-amber-500 text-amber-300 font-bold'
-                                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                                  ? 'bg-amber-500/20 border-amber-500 text-amber-300'
+                                  : 'bg-slate-950 border-slate-800 text-slate-500'
                               }`}
                             >
-                              <span>{day.short}</span>
-                              <div
-                                className={`w-3 h-3 rounded flex items-center justify-center ${
-                                  isChecked
-                                    ? 'bg-amber-500 text-slate-950 font-bold'
-                                    : 'border border-slate-700'
-                                }`}
-                              >
-                                {isChecked && <Check className="w-2 h-2 stroke-[3]" />}
-                              </div>
+                              {day.short}
                             </button>
                           );
                         })}
                       </div>
                     </div>
 
-                    {/* 3 Special Time Inputs */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-                      <div className="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800">
-                        <label className="block text-[11px] font-semibold text-emerald-400 mb-1">
-                          Jam Masuk Khusus (WIB):
+                    <div className="bg-slate-900 p-3.5 rounded-xl border border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>Jam Pulang Khusus (WIB)</span>
                         </label>
-                        <input
-                          type="time"
-                          value={currentProfile.specialSchedule?.entryTime || '07:00'}
-                          onChange={(e) =>
-                            handleUpdateCurrentProfile((prev) => ({
-                              ...prev,
-                              specialSchedule: {
-                                ...prev.specialSchedule,
-                                entryTime: e.target.value,
-                              },
-                            }))
-                          }
-                          className="w-full bg-slate-950 border border-slate-700 focus:border-amber-500 rounded-md px-2.5 py-1 text-xs font-mono text-white focus:outline-none"
-                        />
+                        <span className="text-[10px] text-amber-400/80 font-mono">Lebih Awal</span>
                       </div>
-
-                      <div className="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800">
-                        <label className="block text-[11px] font-semibold text-amber-400 mb-1">
-                          Batas Terlambat Khusus (WIB):
-                        </label>
-                        <input
-                          type="time"
-                          value={currentProfile.specialSchedule?.cutoffTime || '07:15'}
-                          onChange={(e) =>
-                            handleUpdateCurrentProfile((prev) => ({
-                              ...prev,
-                              specialSchedule: {
-                                ...prev.specialSchedule,
-                                cutoffTime: e.target.value,
-                              },
-                            }))
-                          }
-                          className="w-full bg-slate-950 border border-slate-700 focus:border-amber-500 rounded-md px-2.5 py-1 text-xs font-mono text-white focus:outline-none"
-                        />
-                      </div>
-
-                      <div className="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800">
-                        <label className="block text-[11px] font-semibold text-sky-400 mb-1">
-                          Jam Pulang Khusus (WIB):
-                        </label>
-                        <input
-                          type="time"
-                          value={currentProfile.specialSchedule?.homeTime || '10:45'}
-                          onChange={(e) =>
-                            handleUpdateCurrentProfile((prev) => ({
-                              ...prev,
-                              specialSchedule: {
-                                ...prev.specialSchedule,
-                                homeTime: e.target.value,
-                              },
-                            }))
-                          }
-                          className="w-full bg-slate-950 border border-slate-700 focus:border-amber-500 rounded-md px-2.5 py-1 text-xs font-mono text-white focus:outline-none"
-                        />
+                      <input
+                        type="time"
+                        value={currentProfile.specialSchedule?.homeTime || '10:45'}
+                        onChange={(e) =>
+                          handleUpdateCurrentProfile((prev) => ({
+                            ...prev,
+                            specialSchedule: {
+                              ...prev.specialSchedule,
+                              homeTime: e.target.value,
+                            },
+                          }))
+                        }
+                        className="w-full bg-slate-950 border border-slate-700 focus:border-amber-500 rounded-lg px-3 py-1.5 text-sm font-mono font-bold text-white focus:outline-none"
+                      />
+                      <div className="flex gap-1">
+                        {['10:15', '10:30', '10:45', '11:00', '11:15'].map((t) => (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() =>
+                              handleUpdateCurrentProfile((prev) => ({
+                                ...prev,
+                                specialSchedule: {
+                                  ...prev.specialSchedule,
+                                  homeTime: t,
+                                },
+                              }))
+                            }
+                            className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 rounded text-[10px] font-mono text-slate-300 transition"
+                          >
+                            {t}
+                          </button>
+                        ))}
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <p className="text-[11px] text-slate-400 italic">
-                    Jam khusus dinonaktifkan untuk profil ini. Semua hari sekolah mengikuti Jam Reguler.
+                  <p className="text-xs text-slate-400 italic">
+                    Jam khusus dinonaktifkan. Semua hari sekolah mengikuti Jam Reguler.
                   </p>
                 )}
               </div>
 
               {/* 4. RINGKASAN MINGGUAN */}
               <div className="bg-slate-950/70 p-3.5 rounded-xl border border-slate-800 space-y-2">
-                <h5 className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
+                <h5 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
                   <Calendar className="w-3.5 h-3.5 text-emerald-400" />
-                  Ringkasan Hari Mingguan Profil Ini:
+                  <span>Ringkasan Jadwal Mingguan Profil Ini:</span>
                 </h5>
 
-                <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5 pt-1">
-                  {ALL_DAYS.map((day) => {
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-1">
+                  {ALL_DAYS.slice(0, 6).map((day) => {
                     const isSpecial =
                       currentProfile.enableSpecialSchedule &&
                       currentProfile.specialSchedule?.days?.includes(day.key);
@@ -1110,13 +1055,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       return (
                         <div
                           key={day.key}
-                          className="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-center"
+                          className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-center space-y-0.5"
                         >
-                          <div className="text-[11px] font-bold text-amber-300">{day.short}</div>
-                          <div className="text-[10px] text-amber-200 font-mono">
-                            {currentProfile.specialSchedule?.homeTime}
+                          <div className="text-xs font-bold text-amber-300">{day.label}</div>
+                          <div className="text-[11px] text-amber-200 font-mono font-semibold">
+                            Pulang {currentProfile.specialSchedule?.homeTime}
                           </div>
-                          <span className="text-[9px] px-1 bg-amber-500/20 text-amber-300 rounded font-semibold">
+                          <span className="inline-block text-[9px] px-1.5 py-0.2 bg-amber-500/20 text-amber-300 rounded font-semibold">
                             Khusus
                           </span>
                         </div>
@@ -1127,13 +1072,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       return (
                         <div
                           key={day.key}
-                          className="p-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-center"
+                          className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center space-y-0.5"
                         >
-                          <div className="text-[11px] font-bold text-emerald-300">{day.short}</div>
-                          <div className="text-[10px] text-emerald-200 font-mono">
-                            {currentProfile.regularSchedule?.homeTime}
+                          <div className="text-xs font-bold text-emerald-300">{day.label}</div>
+                          <div className="text-[11px] text-emerald-200 font-mono font-semibold">
+                            Pulang {currentProfile.regularSchedule?.homeTime}
                           </div>
-                          <span className="text-[9px] px-1 bg-emerald-500/20 text-emerald-300 rounded font-semibold">
+                          <span className="inline-block text-[9px] px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 rounded font-semibold">
                             Reguler
                           </span>
                         </div>
@@ -1143,9 +1088,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     return (
                       <div
                         key={day.key}
-                        className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-center opacity-50"
+                        className="p-2 rounded-xl bg-slate-900/60 border border-slate-800 text-center opacity-60"
                       >
-                        <div className="text-[11px] font-medium text-slate-400">{day.short}</div>
+                        <div className="text-xs font-medium text-slate-400">{day.label}</div>
                         <div className="text-[10px] text-slate-500">Libur</div>
                       </div>
                     );

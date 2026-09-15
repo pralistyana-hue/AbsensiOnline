@@ -92,6 +92,7 @@ export interface NotificationLog {
   type: 'LATE' | 'ABSENT' | 'PERMISSION_APPROVED' | 'PULANG' | 'NOT_PICKED_UP' | 'PERMIT';
   message: string;
   sentAt: string;
+  date?: string; // YYYY-MM-DD for automatic daily cleanup
   status: 'SENT' | 'FAILED' | 'QUEUED';
 }
 

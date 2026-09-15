@@ -10,6 +10,7 @@ const STORAGE_KEYS = {
   SCAN_FAILURES: 'absensi_scan_failures_v1',
   SETTINGS: 'absensi_settings_v1',
   RECENT_SCANS: 'absensi_recent_scans_cache_v1',
+  INITIALIZED: 'absensi_data_initialized_v1',
 };
 
 export const checkScanThrottle = (
@@ -71,17 +72,37 @@ export const sanitizeClass = (cls: string): string => {
 };
 
 export const Storage = {
+  isInitialized(): boolean {
+    try {
+      return localStorage.getItem(STORAGE_KEYS.INITIALIZED) === 'true';
+    } catch {
+      return false;
+    }
+  },
+
+  markInitialized(): void {
+    try {
+      localStorage.setItem(STORAGE_KEYS.INITIALIZED, 'true');
+    } catch (e) {
+      console.error('Failed to set initialized flag', e);
+    }
+  },
+
   getStudents(): Student[] {
     try {
+      const isInit = localStorage.getItem(STORAGE_KEYS.INITIALIZED);
       const data = localStorage.getItem(STORAGE_KEYS.STUDENTS);
-      if (!data) return INITIAL_STUDENTS;
+      if (data === null) {
+        if (isInit === 'true') return [];
+        return INITIAL_STUDENTS;
+      }
       const parsed: Student[] = JSON.parse(data);
       return parsed.map((s) => ({
         ...s,
         class: sanitizeClass(s.class),
       }));
     } catch {
-      return INITIAL_STUDENTS;
+      return [];
     }
   },
 
@@ -95,15 +116,19 @@ export const Storage = {
 
   getTeachers(): HomeroomTeacher[] {
     try {
+      const isInit = localStorage.getItem(STORAGE_KEYS.INITIALIZED);
       const data = localStorage.getItem(STORAGE_KEYS.TEACHERS);
-      if (!data) return INITIAL_TEACHERS;
+      if (data === null) {
+        if (isInit === 'true') return [];
+        return INITIAL_TEACHERS;
+      }
       const parsed: HomeroomTeacher[] = JSON.parse(data);
       return parsed.map((t) => ({
         ...t,
         assignedClass: sanitizeClass(t.assignedClass),
       }));
     } catch {
-      return INITIAL_TEACHERS;
+      return [];
     }
   },
 
@@ -117,19 +142,21 @@ export const Storage = {
 
   getAttendance(): AttendanceRecord[] {
     try {
+      const isInit = localStorage.getItem(STORAGE_KEYS.INITIALIZED);
       const data = localStorage.getItem(STORAGE_KEYS.ATTENDANCE);
-      if (data) {
+      if (data !== null) {
         const records: AttendanceRecord[] = JSON.parse(data);
         return records.map((r) => ({
           ...r,
           class: sanitizeClass(r.class),
         }));
       }
+      if (isInit === 'true') return [];
       const initial = generateInitialAttendance(INITIAL_STUDENTS);
       localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(initial));
       return initial;
     } catch {
-      return generateInitialAttendance(INITIAL_STUDENTS);
+      return [];
     }
   },
 
@@ -138,6 +165,26 @@ export const Storage = {
       localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(records));
     } catch (e) {
       console.error('Failed to save attendance', e);
+    }
+  },
+
+  clearData(options: { students?: boolean; teachers?: boolean; attendance?: boolean; permissions?: boolean }): void {
+    try {
+      localStorage.setItem(STORAGE_KEYS.INITIALIZED, 'true');
+      if (options.students) {
+        localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify([]));
+      }
+      if (options.teachers) {
+        localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify([]));
+      }
+      if (options.attendance) {
+        localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify([]));
+      }
+      if (options.permissions) {
+        localStorage.setItem(STORAGE_KEYS.PERMISSIONS, JSON.stringify([]));
+      }
+    } catch (e) {
+      console.error('Failed to clear data in localStorage:', e);
     }
   },
 
@@ -168,7 +215,21 @@ export const Storage = {
   getNotificationLogs(): NotificationLog[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.LOGS);
-      return data ? JSON.parse(data) : [];
+      if (!data) return [];
+      const parsed: NotificationLog[] = JSON.parse(data);
+      const todayStr = new Date().toISOString().split('T')[0];
+      // Automatically keep only today's messages (pesan terhapus otomatis di hari selanjutnya)
+      const validLogs = parsed.filter((log) => {
+        if (log.date) {
+          return log.date === todayStr;
+        }
+        // Fallback: if sentAt contains ISO date, check match; otherwise default to today
+        return true;
+      });
+      if (validLogs.length !== parsed.length) {
+        localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(validLogs));
+      }
+      return validLogs;
     } catch {
       return [];
     }
@@ -176,7 +237,12 @@ export const Storage = {
 
   saveNotificationLogs(logs: NotificationLog[]): void {
     try {
-      localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(logs));
+      const todayStr = new Date().toISOString().split('T')[0];
+      const withDates = logs.map((l) => ({
+        ...l,
+        date: l.date || todayStr,
+      }));
+      localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(withDates));
     } catch (e) {
       console.error('Failed to save notification logs', e);
     }

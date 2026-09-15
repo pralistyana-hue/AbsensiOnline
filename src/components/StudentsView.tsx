@@ -23,9 +23,12 @@ import {
   List,
   Sparkles,
   UserCheck,
+  Server,
 } from 'lucide-react';
 import { Student, AppSettings, HomeroomTeacher } from '../types';
 import { LibraryImportModal } from './LibraryImportModal';
+import { BackupDataModal } from './BackupDataModal';
+import { ClearDataModal } from './ClearDataModal';
 import { generateStudentQRCode } from '../utils/qrGenerator';
 import { generate1DBarcodeDataUrl } from '../utils/barcodeGenerator';
 import { exportSingleCardToPDF, exportStudentCardsToPDF } from '../utils/exportUtils';
@@ -43,6 +46,16 @@ interface StudentsViewProps {
   onAddTeacher?: (teacher: HomeroomTeacher) => void;
   onUpdateTeacher?: (teacher: HomeroomTeacher) => void;
   onDeleteTeacher?: (id: string) => void;
+  onDeleteClass?: (className: string, deleteStudents: boolean) => void;
+  onClearData?: (options: {
+    clearStudents: boolean;
+    clearTeachers: boolean;
+    clearAttendance: boolean;
+  }) => Promise<void>;
+  onRestoreBackup?: (backupData: {
+    students?: Student[];
+    teachers?: HomeroomTeacher[];
+  }) => Promise<void>;
 }
 
 type ViewMode = 'by_class' | 'all_students' | 'teachers';
@@ -58,6 +71,9 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
   onAddTeacher,
   onUpdateTeacher,
   onDeleteTeacher,
+  onDeleteClass,
+  onClearData,
+  onRestoreBackup,
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('by_class');
   const [searchQuery, setSearchQuery] = useState('');
@@ -67,6 +83,8 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
   const [isAddStudentModalOpen, setIsAddStudentModalOpen] = useState(false);
   const [isTeacherModalOpen, setIsTeacherModalOpen] = useState(false);
   const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
+  const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
+  const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [editingTeacher, setEditingTeacher] = useState<HomeroomTeacher | null>(null);
   const [cardModalStudent, setCardModalStudent] = useState<Student | null>(null);
@@ -94,17 +112,36 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
   const [teacherClass, setTeacherClass] = useState('Kelas 1');
   const [teacherNotes, setTeacherNotes] = useState('');
 
-  // Distinct classes list
+  // Delete class modal state
+  const [deleteClassModal, setDeleteClassModal] = useState<{
+    isOpen: boolean;
+    className: string;
+    studentCount: number;
+    teacherName?: string;
+    deleteStudents: boolean;
+  }>({
+    isOpen: false,
+    className: '',
+    studentCount: 0,
+    teacherName: undefined,
+    deleteStudents: true,
+  });
+
+  // Distinct classes list (sourced from rombels, settings, students, and teachers)
   const classesList = useMemo(() => {
-    const raw = Array.from(
-      new Set([
-        ...INITIAL_CLASSES,
-        ...students.map((s) => s.class),
-        ...teachers.map((t) => t.assignedClass),
-      ])
-    ).filter(Boolean);
-    return raw.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-  }, [students, teachers]);
+    const rombelNames = settings.managedRombels?.map((r) => r.name) || [];
+    const customNames = settings.customClasses || [];
+    const studentClasses = students.map((s) => s.class);
+    const teacherClasses = teachers.map((t) => t.assignedClass);
+
+    let raw: string[] = [];
+    if (settings.managedRombels !== undefined || settings.customClasses !== undefined) {
+      raw = Array.from(new Set([...rombelNames, ...customNames, ...studentClasses, ...teacherClasses]));
+    } else {
+      raw = Array.from(new Set([...INITIAL_CLASSES, ...studentClasses, ...teacherClasses]));
+    }
+    return raw.filter(Boolean).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  }, [students, teachers, settings.managedRombels, settings.customClasses]);
 
   // Reset pagination on filter change
   useEffect(() => {
@@ -349,6 +386,28 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
 
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2">
+            {/* Backup Data (JSON / Excel / Restore) */}
+            <button
+              onClick={() => setIsBackupModalOpen(true)}
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-sky-200 text-xs font-semibold rounded-xl flex items-center gap-1.5 border border-slate-700 transition shadow-sm"
+              title="Cadangkan data siswa & guru wali (JSON / Excel / CSV) atau pulihkan dari file backup"
+            >
+              <Download className="w-4 h-4 text-sky-400" />
+              <span>Backup Data</span>
+            </button>
+
+            {/* Kosongkan Data (Clean State untuk Rumahweb) */}
+            {onClearData && (
+              <button
+                onClick={() => setIsClearModalOpen(true)}
+                className="px-3.5 py-2 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-xs font-semibold rounded-xl flex items-center gap-1.5 border border-rose-800/50 transition shadow-sm"
+                title="Kosongkan data siswa & wali kelas untuk persiapan upload ke hosting Rumahweb"
+              >
+                <Trash2 className="w-4 h-4 text-rose-400" />
+                <span>Kosongkan Data</span>
+              </button>
+            )}
+
             <button
               onClick={() => setIsLibraryModalOpen(true)}
               className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl flex items-center gap-1.5 border border-slate-700 transition"
@@ -386,6 +445,49 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Clean Slate / Empty Data Banner (Rumahweb Ready) */}
+        {students.length === 0 && teachers.length === 0 && (
+          <div className="p-5 rounded-3xl bg-gradient-to-r from-emerald-950/30 via-slate-900 to-sky-950/30 border border-emerald-500/30 shadow-xl space-y-3">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+                  <Sparkles className="w-6 h-6" />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm font-bold text-white">
+                      Data Siswa & Wali Kelas Kosong (Siap Upload ke Rumahweb)
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                      Clean Slate
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+                    Database lokal dan Firestore telah bersih dari data contoh. Aplikasi Anda sekarang siap digunakan dengan data sekolah asli di cPanel / hosting <strong>Rumahweb</strong>.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <button
+                  onClick={() => setIsBackupModalOpen(true)}
+                  className="px-3.5 py-2 rounded-xl text-xs font-bold text-sky-300 bg-sky-950/60 hover:bg-sky-900/60 border border-sky-500/30 transition flex items-center gap-1.5"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Pulihkan Backup</span>
+                </button>
+                <button
+                  onClick={() => handleOpenAddStudentModal()}
+                  className="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-950 bg-emerald-500 hover:bg-emerald-400 transition shadow-md shadow-emerald-500/20 flex items-center gap-1.5"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>+ Tambah Siswa</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* View Mode Switcher Tabs */}
         <div className="flex items-center justify-between border-t border-slate-800 mt-4 pt-4 gap-3 flex-wrap">
@@ -599,6 +701,25 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                         <UserPlus className="w-3.5 h-3.5" />
                         <span className="hidden sm:inline">+ Siswa</span>
                       </button>
+
+                      {onDeleteClass && (
+                        <button
+                          onClick={() => {
+                            setDeleteClassModal({
+                              isOpen: true,
+                              className,
+                              studentCount: classStudents.length,
+                              teacherName: teacher?.name,
+                              deleteStudents: true,
+                            });
+                          }}
+                          className="px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 hover:text-rose-300 text-xs font-bold rounded-xl flex items-center gap-1 transition"
+                          title={`Hapus Kelas ${className}`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Hapus Kelas</span>
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -1326,6 +1447,96 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
         </div>
       )}
 
+      {/* Delete Class Confirmation Modal */}
+      {deleteClassModal.isOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center space-x-3 text-rose-400">
+              <div className="p-3 bg-rose-500/10 rounded-xl border border-rose-500/20">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">
+                  Hapus {deleteClassModal.className}?
+                </h3>
+                <p className="text-xs text-slate-400">Konfirmasi hapus kelas di data siswa</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-950/70 p-3.5 rounded-xl border border-slate-800 space-y-2 text-xs">
+              <div className="flex justify-between text-slate-300">
+                <span>Jumlah Siswa Terdaftar:</span>
+                <strong className="text-white">{deleteClassModal.studentCount} Siswa</strong>
+              </div>
+              <div className="flex justify-between text-slate-300">
+                <span>Wali Kelas:</span>
+                <span className="text-slate-300 font-medium">
+                  {deleteClassModal.teacherName || 'Belum Ditetapkan'}
+                </span>
+              </div>
+            </div>
+
+            {deleteClassModal.studentCount > 0 ? (
+              <label className="flex items-start space-x-2.5 p-3 rounded-xl bg-rose-950/20 border border-rose-500/30 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={deleteClassModal.deleteStudents}
+                  onChange={(e) =>
+                    setDeleteClassModal((prev) => ({
+                      ...prev,
+                      deleteStudents: e.target.checked,
+                    }))
+                  }
+                  className="mt-0.5 rounded text-rose-500 focus:ring-rose-500 bg-slate-900 border-slate-700"
+                />
+                <div className="text-xs">
+                  <span className="font-bold text-rose-300 block">
+                    Hapus juga seluruh {deleteClassModal.studentCount} data siswa di kelas ini
+                  </span>
+                  <span className="text-[11px] text-slate-400 block mt-0.5">
+                    {deleteClassModal.deleteStudents
+                      ? 'Semua data dan kartu presensi siswa di kelas ini akan dihapus dari sistem.'
+                      : 'Data siswa tetap ada tanpa rombel kelas ini.'}
+                  </span>
+                </div>
+              </label>
+            ) : (
+              <p className="text-xs text-slate-400 italic">
+                Kelas ini tidak memiliki siswa. Menghapus kelas akan menghapus rombel dari daftar kelas aktif.
+              </p>
+            )}
+
+            <div className="flex items-center justify-end space-x-2 pt-2">
+              <button
+                type="button"
+                onClick={() =>
+                  setDeleteClassModal((prev) => ({ ...prev, isOpen: false }))
+                }
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 transition"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onDeleteClass && deleteClassModal.className) {
+                    onDeleteClass(deleteClassModal.className, deleteClassModal.deleteStudents);
+                    if (selectedClassTab === deleteClassModal.className) {
+                      setSelectedClassTab('ALL');
+                    }
+                  }
+                  setDeleteClassModal((prev) => ({ ...prev, isOpen: false }));
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 transition shadow-lg shadow-rose-600/20 flex items-center space-x-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Ya, Hapus Kelas Ini</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Library Card PDF Import Modal */}
       <LibraryImportModal
         isOpen={isLibraryModalOpen}
@@ -1335,6 +1546,30 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
         onImportSuccess={(newStudents) => {
           newStudents.forEach((s) => onAddStudent(s));
           alert(`Berhasil mengimpor ${newStudents.length} data siswa dari kartu perpustakaan!`);
+        }}
+      />
+
+      {/* Backup & Cadangan Data Modal */}
+      <BackupDataModal
+        isOpen={isBackupModalOpen}
+        onClose={() => setIsBackupModalOpen(false)}
+        students={students}
+        teachers={teachers}
+        settings={settings}
+        onRestoreBackup={onRestoreBackup}
+      />
+
+      {/* Clear Data Modal (Clean State untuk Rumahweb) */}
+      <ClearDataModal
+        isOpen={isClearModalOpen}
+        onClose={() => setIsClearModalOpen(false)}
+        students={students}
+        teachers={teachers}
+        settings={settings}
+        onConfirmClear={async (options) => {
+          if (onClearData) {
+            await onClearData(options);
+          }
         }}
       />
     </div>
